@@ -48,6 +48,8 @@ jobs:
           go-version: "1.24"
       - name: windows installer (embeds this apk and data/fireos)
         run: ./installer/build.sh
+      - name: installer against fake Fire TVs (slow prompt, sleeping TV, old key, Fire OS 6, restore)
+        run: ./installer/e2e/run.sh installer/cleantv-installer-linux
       - name: upload the installer
         uses: actions/upload-artifact@v4
         with:
