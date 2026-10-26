@@ -8,7 +8,7 @@ par un accueil simple et rapide : vos apps, vos entrées HDMI, rien d'autre.
 - Désactive les services Amazon de pubs, de pistage et de télémétrie (rien n'est supprimé).
 - Garde Alexa et le bouton vocal, sauf si vous choisissez de les couper.
 - Installe l'accueil cleantv et lui confie le bouton Home.
-- Propose d'installer SmartTube (YouTube sans pubs).
+- Installe SmartTube (YouTube sans pubs) et le place en premier sur l'accueil.
 - Tout est réversible : relancez-le et choisissez « Tout restaurer ».
 
 ## Installation (Windows)

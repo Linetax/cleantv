@@ -8,9 +8,7 @@ import (
 	"archive/zip"
 	"bufio"
 	"bytes"
-	"crypto/sha256"
 	"embed"
-	"encoding/hex"
 	"fmt"
 	"io"
 	"net"
@@ -34,10 +32,9 @@ const (
 	guardBind = "Service[label=dumbtv home button,"
 	guardRaw  = "Service[label=tv.dumbtv.home.Guard,"
 
-	// Pinned build: releases are immutable, the hash identifies it. Universal runs on 32- and 64-bit Fire OS.
 	smartTubePkg = "org.smarttube.stable"
-	smartTubeURL = "https://github.com/yuliskov/SmartTube/releases/download/32.68s/SmartTube_stable_32.68_universal.apk"
-	smartTubeSHA = "45a36e62110bcb866527ba8e9ab876f4122e1143647bbd0a97362d13803f6b94"
+	// The home screen applies a settings file pushed here once (Fire OS 8 closes its data folder to adb).
+	homeMedia = "/sdcard/Android/media/" + pkgHome
 )
 
 var (
@@ -403,7 +400,6 @@ func applySettings(file string) {
 
 func install() {
 	keepAlexa := yes("Garder Alexa et le bouton vocal de la télécommande ?", true)
-	smartTube := yes("Installer SmartTube (YouTube sans pubs) ?", true)
 
 	step("Allègement : désactivation des services Amazon")
 	never := map[string]bool{}
@@ -446,12 +442,16 @@ func install() {
 		applySettings("settings.alexa.txt")
 	}
 
-	step("Accueil cleantv")
-	installHome()
+	// SmartTube first, so the home screen lists it from its very first draw.
+	step("SmartTube (YouTube sans pubs)")
+	installSmartTube()
 
-	if smartTube {
-		step("SmartTube")
-		installSmartTube()
+	step("Accueil cleantv")
+	fresh := !strings.HasPrefix(sh("pm path "+pkgHome), "package:")
+	installHome()
+	if fresh {
+		// Only on a first install: an existing home screen keeps the order its owner chose.
+		pushHomeConf("apps.order=" + smartTubePkg + "\n")
 	}
 
 	step("Terminé")
@@ -542,17 +542,11 @@ func startHome() {
 	sh("am start -n " + pkgHome + "/.Home")
 }
 
+// installSmartTube installs the APK build.sh embedded after checking its pinned SHA-256.
 func installSmartTube() {
-	fmt.Println("Téléchargement de SmartTube...")
-	apk, err := download(smartTubeURL)
+	apk, err := assets.ReadFile("assets/smarttube.apk")
 	if err != nil {
-		fmt.Println("  téléchargement impossible : " + err.Error() + " (SmartTube ignoré)")
-		return
-	}
-	sum := sha256.Sum256(apk)
-	if hex.EncodeToString(sum[:]) != smartTubeSHA {
-		fmt.Println("  fichier différent de la version vérifiée : SmartTube ignoré")
-		return
+		die("APK SmartTube absent de l'installateur.")
 	}
 	// Over Wi-Fi the session can drop after the push and before "Success"; the TV's answer counts.
 	for i := 0; i < 2; i++ {
@@ -564,6 +558,18 @@ func installSmartTube() {
 		}
 	}
 	fmt.Println("  SmartTube n'a pas pu être installé.")
+}
+
+func pushHomeConf(conf string) {
+	tmp := filepath.Join(os.TempDir(), "cleantv-home.conf")
+	if err := os.WriteFile(tmp, []byte(conf), 0o644); err != nil {
+		return
+	}
+	defer os.Remove(tmp)
+	sh("mkdir -p " + homeMedia)
+	adb("push", tmp, homeMedia+"/home.conf")
+	startHome()
+	fmt.Println("  SmartTube placé en premier sur l'accueil")
 }
 
 // ---------- HOME takeover helpers (ported from launcher/install.sh and scripts/home.sh) ----------

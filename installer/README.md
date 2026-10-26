@@ -9,7 +9,7 @@ run it. It walks through:
 2. finding the TV's IP address and accepting the prompt on the TV,
 3. **Install**: disables the Amazon packages in `data/fireos/packages.txt` (Alexa too
    if you say so), applies `settings.txt`, installs the cleantv home screen and gives
-   it the HOME button, and optionally installs SmartTube,
+   it the HOME button, and installs the embedded SmartTube (first on a fresh home screen),
 4. **Restore**: re-enables those packages, applies `settings.restore.txt` and hands
    HOME back to Amazon.
 
