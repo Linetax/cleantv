@@ -1,6 +1,7 @@
 name: release
 
-# Push a tag like v1.0.0: builds the APK and the installers, then publishes them as a release.
+# Push a tag like v1.0.0, or publish a release from the GitHub page with a new v* tag: builds
+# the APK and the installers, then attaches them to that release with the French notes.
 on:
   push:
     tags: ["v*"]
@@ -41,7 +42,11 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "$GITHUB_REF_NAME" --title "cleantv $GITHUB_REF_NAME" \
-            --notes-file installer/RELEASE.md \
-            installer/cleantv-installer.exe installer/cleantv-installer-linux \
-            installer/cleantv-installer-macos launcher/build/dumbtv-home.apk
+          files="installer/cleantv-installer.exe installer/cleantv-installer-linux installer/cleantv-installer-macos launcher/build/dumbtv-home.apk"
+          # A release made on the GitHub page already exists: fill it in instead of failing.
+          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+            gh release edit "$GITHUB_REF_NAME" --title "cleantv $GITHUB_REF_NAME" --notes-file installer/RELEASE.md
+            gh release upload "$GITHUB_REF_NAME" $files --clobber
+          else
+            gh release create "$GITHUB_REF_NAME" --title "cleantv $GITHUB_REF_NAME" --notes-file installer/RELEASE.md $files
+          fi
