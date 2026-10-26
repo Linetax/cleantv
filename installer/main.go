@@ -8,6 +8,7 @@ import (
 	"archive/zip"
 	"bufio"
 	"bytes"
+	"context"
 	"embed"
 	"fmt"
 	"io"
@@ -225,11 +226,19 @@ func download(url string) ([]byte, error) {
 	return nil, last
 }
 
+// adb runs one adb command. A TV that goes to sleep mid-command can leave adb hanging for
+// ever, so every call has a deadline: long for pushing an APK over Wi-Fi, short otherwise.
 func adb(args ...string) string {
+	limit := 30 * time.Second
+	if args[0] == "install" || args[0] == "push" {
+		limit = 10 * time.Minute
+	}
 	if serial != "" && args[0] != "connect" && args[0] != "disconnect" {
 		args = append([]string{"-s", serial}, args...)
 	}
-	out, _ := exec.Command(adbPath, args...).CombinedOutput()
+	ctx, cancel := context.WithTimeout(context.Background(), limit)
+	defer cancel()
+	out, _ := exec.CommandContext(ctx, adbPath, args...).CombinedOutput()
 	return strings.TrimSpace(strings.ReplaceAll(string(out), "\r", ""))
 }
 
@@ -260,7 +269,7 @@ func connect() {
 			fmt.Println("Ce n'est pas une adresse IP valide. Elle ressemble à 192.168.1.42.")
 			continue
 		}
-		fmt.Println("Connexion à " + target + "...")
+		fmt.Println("Connexion à " + target + "... (gardez la TV allumée pendant toute l'installation)")
 		fmt.Println("Si la TV affiche « Autoriser le débogage USB ? », cochez « Toujours autoriser »")
 		fmt.Println("depuis cet ordinateur, puis choisissez OK.")
 		if waitDevice(target) {
@@ -296,29 +305,42 @@ func parseTarget(s string) (string, bool) {
 
 func waitDevice(target string) bool {
 	warned := false
-	for i := 0; i < 60; i++ {
-		if i%5 == 0 {
+	for i := 0; i < 90; i++ {
+		if i%10 == 9 {
+			// adb can keep a connection marked unauthorized after the prompt was accepted;
+			// a fresh connection picks up the key the TV now trusts.
+			adb("disconnect", target)
+		}
+		if i%5 == 0 || i%10 == 9 {
 			adb("connect", target)
 		}
 		state := adb("-s", target, "get-state")
 		switch {
 		case state == "device":
+			fmt.Println()
 			return true
 		case strings.Contains(state, "unauthorized") && !warned:
-			fmt.Println(">> Acceptez le message affiché sur la TV.")
+			fmt.Println(">> Acceptez le message affiché sur la TV (cochez « Toujours autoriser »).")
 			warned = true
 		}
+		fmt.Print(".")
 		time.Sleep(time.Second)
 	}
+	fmt.Println()
 	return false
 }
 
 func detect() {
-	sdk, _ = strconv.Atoi(sh("getprop ro.build.version.sdk"))
+	var err error
+	if sdk, err = strconv.Atoi(sh("getprop ro.build.version.sdk")); err != nil {
+		// No answer at all is a lost connection, not a different kind of device.
+		die("La TV ne répond plus. Gardez-la allumée (appuyez sur une touche de la télécommande\n" +
+			"si l'écran s'est mis en veille), puis relancez l'installateur.")
+	}
 	model := sh("getprop ro.product.model")
 	maker := sh("getprop ro.product.manufacturer")
 	fmt.Printf("Appareil : %s %s, %s (Android sdk %d)\n", maker, model, fireOSName(), sdk)
-	if !strings.HasPrefix(sh("pm path com.amazon.tv.launcher"), "package:") {
+	if !strings.Contains(sh("pm path com.amazon.tv.launcher"), "package:") {
 		die("Cet appareil n'est pas une Fire TV (Fire OS). cleantv ne fonctionne que sur Fire OS.")
 	}
 	if sdk < 25 {
