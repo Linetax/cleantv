@@ -7,6 +7,8 @@ import android.graphics.drawable.Drawable;
 /** Samples a small, separate copy of app art on the existing artwork worker. */
 final class FocusColor {
     static final int FALLBACK = 0xFF141518;
+    /** Outer color of the adaptive glow. */
+    static final int EDGE = 0xFF08080B;
 
     private FocusColor() {}
 

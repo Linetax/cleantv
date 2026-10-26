@@ -12,6 +12,7 @@ import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.Color;
 import android.graphics.Rect;
+import android.graphics.drawable.GradientDrawable;
 import android.media.tv.TvInputManager;
 import android.net.Uri;
 import android.os.Bundle;
@@ -22,6 +23,7 @@ import android.text.SpannableString;
 import android.text.Spanned;
 import android.text.format.DateFormat;
 import android.text.style.RelativeSizeSpan;
+import android.util.TypedValue;
 import android.view.Gravity;
 import android.view.KeyEvent;
 import android.view.View;
@@ -66,7 +68,8 @@ public final class Home extends Activity {
     private ImageView wall;
     private View shade;
     private View tint;
-    private TextView clock, date;
+    private TextView greeting, clock, date;
+    private final GradientDrawable glow = new GradientDrawable();
     private Meter meter;
     private Row apps, inputs;
     private Map<String, Long> recent = new HashMap<>();
@@ -486,11 +489,24 @@ public final class Home extends Activity {
         head.setPadding(dp(56), 0, dp(56), dp(12));
         LinearLayout when = new LinearLayout(this);
         when.setOrientation(LinearLayout.VERTICAL);
+        greeting = Ui.text(this, 13, Ui.MUTED, Ui.MEDIUM);
+        greeting.setLetterSpacing(0.16f);
+        greeting.setPadding(dp(2), 0, 0, dp(10));
+        when.addView(greeting);
+        LinearLayout line = new LinearLayout(this);
+        line.setGravity(Gravity.CENTER_VERTICAL);
         clock = Ui.text(this, 52, Ui.TEXT, Ui.LIGHT);
-        date = Ui.text(this, 15, Ui.MUTED, Ui.MEDIUM);
-        date.setPadding(dp(2), dp(8), 0, 0);
-        when.addView(clock);
-        when.addView(date);
+        line.addView(clock);
+        View bar = new View(this);
+        bar.setBackgroundColor(Ui.FAINT);
+        LinearLayout.LayoutParams barLp = new LinearLayout.LayoutParams(dp(1), dp(36));
+        barLp.leftMargin = dp(20);
+        barLp.rightMargin = dp(20);
+        line.addView(bar, barLp);
+        date = Ui.text(this, 15, Ui.TEXT, Ui.MEDIUM);
+        date.setLetterSpacing(0.14f);
+        line.addView(date);
+        when.addView(line);
         meter = new Meter(this);
         meter.setVisibility(View.GONE);
         LinearLayout.LayoutParams under = new LinearLayout.LayoutParams(WRAP, WRAP);
@@ -499,11 +515,19 @@ public final class Home extends Activity {
         when.addView(meter, under);
         head.addView(when, new LinearLayout.LayoutParams(0, WRAP, 1f));
         head.addView(chip("Options", v -> startActivity(new Intent(this, Options.class))));
-        head.addView(chip("Settings", v -> openSettings()));
+        head.addView(chip("Paramètres", v -> openSettings()));
         column.addView(head, new LinearLayout.LayoutParams(MATCH, WRAP));
 
-        apps = new Row(Catalog.APPS, "Apps", column);
-        inputs = new Row(Catalog.INPUTS, "Inputs", column);
+        apps = new Row(Catalog.APPS, "Applications", column);
+        // The apps row title names the focused app in large type.
+        apps.title.setTextSize(TypedValue.COMPLEX_UNIT_SP, 40);
+        apps.title.setTextColor(Ui.TEXT);
+        apps.title.setLetterSpacing(0f);
+        apps.title.setText("Applications");
+        apps.title.setPadding(dp(56), dp(48), dp(56), dp(6));
+        apps.strip.setBackground(Ui.round(0x40000000, dp(20)));
+        apps.strip.setPadding(dp(14), dp(14), dp(0), dp(14));
+        inputs = new Row(Catalog.INPUTS, "Entrées", column);
         return root;
     }
 
@@ -647,7 +671,9 @@ public final class Home extends Activity {
             Tile t = new Tile(this, it, row.kind, Catalog.label(cfg, it), w, h, labels, accent);
             t.setOnClickListener(v -> open((Tile) v));
             t.setOnFocusChangeListener((v, has) -> {
-                if (has) focusBackground(((Tile) v).item);
+                if (!has) return;
+                focusBackground(((Tile) v).item);
+                if (Catalog.APPS.equals(row.kind)) apps.title.setText(Catalog.label(cfg, ((Tile) v).item));
             });
             t.setOnLongClickListener(v -> {
                 if (!locked()) menu((Tile) v);
@@ -723,8 +749,18 @@ public final class Home extends Activity {
 
     private void setAdaptiveColor(int color) {
         displayedColor = color;
-        if ("adaptive-tint".equals(backgroundMode)) tint.setBackgroundColor(color);
-        else root.setBackgroundColor(color);
+        if ("adaptive-tint".equals(backgroundMode)) {
+            tint.setBackgroundColor(color);
+            return;
+        }
+        // A glow of the focused app's color up and to the left, fading to near black.
+        if (root.getBackground() != glow) {
+            glow.setGradientType(GradientDrawable.RADIAL_GRADIENT);
+            glow.setGradientCenter(0.38f, 0.35f);
+            glow.setGradientRadius(getResources().getDisplayMetrics().widthPixels * 0.55f);
+            root.setBackground(glow);
+        }
+        glow.setColors(new int[] {color, FocusColor.EDGE});
     }
 
     private void stopColorAnimation() {
@@ -768,7 +804,10 @@ public final class Home extends Activity {
             clock.append(half);
         }
         Locale locale = Locale.getDefault();
-        date.setText(DateFormat.format(DateFormat.getBestDateTimePattern(locale, "EEEEdMMMM"), now));
+        date.setText(DateFormat.format(DateFormat.getBestDateTimePattern(locale, "EEEEdMMMM"), now)
+                .toString().toUpperCase(locale));
+        int hour = Integer.parseInt(DateFormat.format("H", now).toString());
+        greeting.setText(hour >= 5 && hour < 12 ? "BONJOUR" : hour >= 12 && hour < 18 ? "BON APRÈS-MIDI" : "BONSOIR");
         if (meter.getVisibility() == View.VISIBLE) {
             meter.update((android.app.ActivityManager) getSystemService(Context.ACTIVITY_SERVICE));
         }
@@ -785,8 +824,8 @@ public final class Home extends Activity {
             if (!mode.equals(backgroundMode)) {
                 stopColorAnimation();
                 targetColor = 0;
-                root.setBackgroundColor(FocusColor.FALLBACK);
-                displayedColor = FocusColor.FALLBACK;
+                backgroundMode = mode;
+                setAdaptiveColor(FocusColor.FALLBACK);
                 tint.setBackgroundColor(Color.TRANSPARENT);
             }
             backgroundMode = mode;
