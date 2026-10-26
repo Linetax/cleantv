@@ -25,13 +25,37 @@ jobs:
           java-version: "17"
       - name: sdk
         run: yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-25" "build-tools;34.0.0" >/dev/null
+      - name: signing key (one stable key from the repo secrets, so updates install over each other)
+        env:
+          KEYSTORE_B64: ${{ secrets.CLEANTV_KEYSTORE_B64 }}
+        run: |
+          if [ -n "$KEYSTORE_B64" ]; then
+            echo "$KEYSTORE_B64" | base64 -d > launcher/release.keystore
+          else
+            echo "::warning::CLEANTV_KEYSTORE_B64 is not set: this APK gets a throwaway key and cannot update an installed one"
+          fi
       - name: build (sdk 25 for fire os 6-8; fails on any android.* API that Android 7.1 lacks)
+        env:
+          DUMBTV_KEYPASS: ${{ secrets.CLEANTV_KEYPASS || 'dumbtvhome' }}
         run: ./launcher/build.sh
       - name: upload the apk (install with ./launcher/install.sh --apk dumbtv-home.apk)
         uses: actions/upload-artifact@v4
         with:
           name: dumbtv-home
           path: launcher/build/dumbtv-home.apk
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.24"
+      - name: windows installer (embeds this apk and data/fireos)
+        run: ./installer/build.sh
+      - name: upload the installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: cleantv-installer
+          path: |
+            installer/cleantv-installer.exe
+            installer/cleantv-installer-linux
+            installer/cleantv-installer-macos
       - name: host-side launcher tests
         run: |
           jar="$ANDROID_HOME/platforms/android-25/android.jar"
