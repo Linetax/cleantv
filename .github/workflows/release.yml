@@ -1,0 +1,54 @@
+name: release
+
+# Push a tag like v1.0.0, or publish a release from the GitHub page with a new v* tag: builds
+# the APK and the installers, then attaches them to that release with the French notes.
+on:
+  push:
+    tags: ["v*"]
+  release:
+    types: [published]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.24"
+      - name: sdk
+        run: yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-25" "build-tools;34.0.0" >/dev/null
+      - name: signing key
+        env:
+          KEYSTORE_B64: ${{ secrets.CLEANTV_KEYSTORE_B64 }}
+        run: |
+          if [ -n "$KEYSTORE_B64" ]; then
+            echo "$KEYSTORE_B64" | base64 -d > launcher/release.keystore
+          else
+            echo "::warning::CLEANTV_KEYSTORE_B64 is not set: this release gets a throwaway key"
+          fi
+      - name: apk
+        env:
+          DUMBTV_KEYPASS: ${{ secrets.CLEANTV_KEYPASS || 'dumbtvhome' }}
+        run: ./launcher/build.sh
+      - name: installers
+        run: ./installer/build.sh
+      - name: publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          files="installer/cleantv-installer.exe installer/cleantv-installer-linux installer/cleantv-installer-macos launcher/build/dumbtv-home.apk"
+          # A release made on the GitHub page already exists: fill it in instead of failing.
+          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+            gh release edit "$GITHUB_REF_NAME" --title "cleantv $GITHUB_REF_NAME" --notes-file installer/RELEASE.md
+            gh release upload "$GITHUB_REF_NAME" $files --clobber
+          else
+            gh release create "$GITHUB_REF_NAME" --title "cleantv $GITHUB_REF_NAME" --notes-file installer/RELEASE.md $files
+          fi
