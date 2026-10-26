@@ -2,6 +2,7 @@
 # Installs dumbtv home on the TV and gives it the HOME button.
 #   ./launcher/install.sh            download the release APK (checksum-verified), install, take over HOME
 #   ./launcher/install.sh --build    build from source instead (needs a JDK and the Android SDK)
+#   ./launcher/install.sh --apk F    install an APK you already have (e.g. this fork's CI build)
 #   ./launcher/install.sh --undo     hand HOME back to Amazon's launcher
 # Pick the device with ADB_SERIAL when more than one is connected.
 set -euo pipefail
@@ -26,8 +27,13 @@ mode=release
 case ${1:-} in
   "") ;;
   --build) mode=build ;;
+  --apk)
+    mode=build
+    # relative to where the script was run from, before the cd above
+    GIVEN_APK=$(cd "$OLDPWD" && cd "$(dirname "${2:-.}")" && pwd)/$(basename "${2:-}")
+    [[ -f $GIVEN_APK ]] || { echo "error: --apk needs an APK file" >&2; exit 2; } ;;
   --undo) mode=undo ;;
-  *) echo "usage: $0 [--build | --undo]" >&2; exit 2 ;;
+  *) echo "usage: $0 [--build | --apk FILE | --undo]" >&2; exit 2 ;;
 esac
 
 command -v "$ADB" >/dev/null || { echo "error: adb not found — install Android platform-tools" >&2; exit 1; }
@@ -87,6 +93,7 @@ if [[ $mode == undo ]]; then
 fi
 
 build_apk() {
+  if [[ -n ${GIVEN_APK:-} ]]; then APK=$GIVEN_APK; return; fi
   ./build.sh
   APK=build/dumbtv-home.apk
 }

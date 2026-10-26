@@ -45,11 +45,13 @@ final class Ui {
         return d;
     }
 
-    /** Accent fill when focused, a faint fill otherwise. */
+    /** Accent fill when focused, a faint outlined pill otherwise. */
     static void focusStyle(TextView v, int accent, int idle, float radius) {
         StateListDrawable bg = new StateListDrawable();
         bg.addState(new int[] {android.R.attr.state_focused}, round(accent, radius));
-        bg.addState(new int[0], round(idle, radius));
+        GradientDrawable pill = round(idle, radius);
+        pill.setStroke(dp(v.getContext(), 1), 0x40FFFFFF);
+        bg.addState(new int[0], pill);
         v.setBackground(bg);
         v.setTextColor(new ColorStateList(
                 new int[][] {{android.R.attr.state_focused}, {}},
