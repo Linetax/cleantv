@@ -34,10 +34,10 @@ const (
 	guardBind = "Service[label=dumbtv home button,"
 	guardRaw  = "Service[label=tv.dumbtv.home.Guard,"
 
-	// Same pinned build as scripts/youtube.sh: releases are immutable, the hash identifies it.
+	// Pinned build: releases are immutable, the hash identifies it. Universal runs on 32- and 64-bit Fire OS.
 	smartTubePkg = "org.smarttube.stable"
-	smartTubeURL = "https://github.com/yuliskov/SmartTube/releases/download/32.56s/SmartTube_stable_32.56_universal.apk"
-	smartTubeSHA = "4a35b90940612e048e4e9cb9e10379f7db1e84f30375994129f10a571ee04ce5"
+	smartTubeURL = "https://github.com/yuliskov/SmartTube/releases/download/32.68s/SmartTube_stable_32.68_universal.apk"
+	smartTubeSHA = "45a36e62110bcb866527ba8e9ab876f4122e1143647bbd0a97362d13803f6b94"
 )
 
 var (
