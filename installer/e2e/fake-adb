@@ -1,0 +1,48 @@
+#!/usr/bin/env bash
+# Stand-in for adb that plays a Fire TV, for installer/e2e/run.sh. Logs every call to
+# $FAKE_DIR/log. FAKE_MODE picks the device: fireos8 (default), fireos6, notfire, dead,
+# hang, slowauth, oldkey.
+d=${FAKE_DIR:?}
+mode=${FAKE_MODE:-fireos8}
+echo "$*" >> "$d/log"
+[[ $1 == -s ]] && shift 2
+case $1 in
+  connect) echo "connected to $2"; exit 0 ;;
+  disconnect) exit 0 ;;
+  get-state)
+    if [[ $mode == slowauth ]]; then
+      n=$(($(cat "$d/auth" 2>/dev/null || echo 0) + 1)); echo $n > "$d/auth"
+      if [[ $n -le 3 ]]; then echo "error: device unauthorized."; exit 1; fi
+    fi
+    echo device; exit 0 ;;
+  install)
+    if [[ $mode == oldkey && ! -f $d/uninstalled && $3 == *home* ]]; then
+      echo "Failure [INSTALL_FAILED_UPDATE_INCOMPATIBLE: signatures do not match]"; exit 1
+    fi
+    touch "$d/$(basename "$3")"; echo Success; exit 0 ;;
+  uninstall) touch "$d/uninstalled"; echo Success; exit 0 ;;
+  push) cp "$2" "$d/pushed"; exit 0 ;;
+  reboot) exit 0 ;;
+  shell) shift ;;
+  *) exit 1 ;;
+esac
+c="$*"
+[[ $mode == dead ]] && { echo "error: closed"; exit 1; }
+[[ $mode == hang ]] && exec sleep 600
+case $c in
+  "getprop ro.build.version.sdk") [[ $mode == fireos6 ]] && echo 25 || echo 30 ;;
+  "getprop ro.product.model") echo "Fake TV" ;;
+  "getprop ro.product.manufacturer") echo Amazon ;;
+  "pm path com.amazon.tv.launcher") [[ $mode != notfire ]] && echo "package:/system/priv-app/launcher.apk" ;;
+  "pm path org.smarttube.stable") [[ -f $d/smarttube.apk ]] && echo "package:/data/app/st.apk" ;;
+  "pm path tv.dumbtv.home")
+    if [[ -f $d/cleantv-home.apk || ($mode == oldkey && ! -f $d/uninstalled) ]]; then echo "package:/data/app/home.apk"; fi ;;
+  "pm list packages") printf 'package:com.amazon.hybridadidservice\npackage:com.amazon.shoptv.client\npackage:com.amazon.tv.launcher\n' ;;
+  "pm list packages -d") echo "package:com.amazon.shoptv.client" ;;
+  "pm disable-user --user 0 "*) echo "Package ${c##* } new state: disabled-user" ;;
+  "settings get secure enabled_accessibility_services") cat "$d/a11y" 2>/dev/null || echo null ;;
+  "settings put secure enabled_accessibility_services "*) v=${c##* }; [[ $v == '""' ]] && v=; printf '%s' "$v" > "$d/a11y" ;;
+  "settings get "*) echo null ;;
+  "dumpsys accessibility") grep -q Guard "$d/a11y" 2>/dev/null && echo "Bound services:{Service[label=dumbtv home button, feedbackType]}" ;;
+esac
+exit 0
