@@ -16,11 +16,13 @@ case $1 in
     fi
     echo device; exit 0 ;;
   install)
-    if [[ $mode == oldkey && ! -f $d/uninstalled && $3 == *home* ]]; then
+    # oldkey: the home screen and Cineflux were installed before with another key.
+    app=${3##*/}; app=${app%.apk}; app=${app#cleantv-}
+    if [[ $mode == oldkey && ($app == home || $app == cineflux) && ! -f $d/uninstalled-$app ]]; then
       echo "Failure [INSTALL_FAILED_UPDATE_INCOMPATIBLE: signatures do not match]"; exit 1
     fi
     touch "$d/$(basename "$3")"; echo Success; exit 0 ;;
-  uninstall) touch "$d/uninstalled"; echo Success; exit 0 ;;
+  uninstall) touch "$d/uninstalled-${2##*.}"; echo Success; exit 0 ;;
   push) cp "$2" "$d/pushed"; exit 0 ;;
   reboot) exit 0 ;;
   shell) shift ;;
@@ -35,8 +37,9 @@ case $c in
   "getprop ro.product.manufacturer") echo Amazon ;;
   "pm path com.amazon.tv.launcher") [[ $mode != notfire ]] && echo "package:/system/priv-app/launcher.apk" ;;
   "pm path org.smarttube.stable") [[ -f $d/smarttube.apk ]] && echo "package:/data/app/st.apk" ;;
+  "pm path party.linetax.cineflux") [[ -f $d/cineflux.apk ]] && echo "package:/data/app/cf.apk" ;;
   "pm path tv.dumbtv.home")
-    if [[ -f $d/cleantv-home.apk || ($mode == oldkey && ! -f $d/uninstalled) ]]; then echo "package:/data/app/home.apk"; fi ;;
+    if [[ -f $d/cleantv-home.apk || ($mode == oldkey && ! -f $d/uninstalled-home) ]]; then echo "package:/data/app/home.apk"; fi ;;
   "pm list packages") printf 'package:com.amazon.hybridadidservice\npackage:com.amazon.shoptv.client\npackage:com.amazon.tv.launcher\n' ;;
   "pm list packages -d") echo "package:com.amazon.shoptv.client" ;;
   "pm disable-user --user 0 "*) echo "Package ${c##* } new state: disabled-user" ;;

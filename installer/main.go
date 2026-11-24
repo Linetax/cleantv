@@ -34,6 +34,7 @@ const (
 	guardRaw  = "Service[label=tv.dumbtv.home.Guard,"
 
 	smartTubePkg = "org.smarttube.stable"
+	cinefluxPkg  = "party.linetax.cineflux"
 	// The home screen applies a settings file pushed here once (Fire OS 8 closes its data folder to adb).
 	homeMedia = "/sdcard/Android/media/" + pkgHome
 )
@@ -422,6 +423,7 @@ func applySettings(file string) {
 
 func install() {
 	keepAlexa := yes("Garder Alexa et le bouton vocal de la télécommande ?", true)
+	cineflux := yes("Installer Cineflux ?", true)
 
 	step("Allègement : désactivation des services Amazon")
 	never := map[string]bool{}
@@ -466,14 +468,21 @@ func install() {
 
 	// SmartTube first, so the home screen lists it from its very first draw.
 	step("SmartTube (YouTube sans pubs)")
-	installSmartTube()
+	installApp("SmartTube", smartTubePkg, "smarttube.apk")
+	order := smartTubePkg
+	if cineflux {
+		step("Cineflux")
+		if installApp("Cineflux", cinefluxPkg, "cineflux.apk") {
+			order += "," + cinefluxPkg
+		}
+	}
 
 	step("Accueil cleantv")
 	fresh := !strings.HasPrefix(sh("pm path "+pkgHome), "package:")
 	installHome()
 	if fresh {
 		// Only on a first install: an existing home screen keeps the order its owner chose.
-		pushHomeConf("apps.order=" + smartTubePkg + "\n")
+		pushHomeConf("apps.order=" + order + "\n")
 	}
 
 	step("Terminé")
@@ -564,22 +573,33 @@ func startHome() {
 	sh("am start -n " + pkgHome + "/.Home")
 }
 
-// installSmartTube installs the APK build.sh embedded after checking its pinned SHA-256.
-func installSmartTube() {
-	apk, err := assets.ReadFile("assets/smarttube.apk")
+// installApp installs an APK that build.sh embedded (SmartTube, Cineflux) and says if it is there.
+func installApp(name, pkg, file string) bool {
+	apk, err := assets.ReadFile("assets/" + file)
 	if err != nil {
-		die("APK SmartTube absent de l'installateur.")
+		die("APK " + name + " absent de l'installateur.")
 	}
 	// Over Wi-Fi the session can drop after the push and before "Success"; the TV's answer counts.
 	for i := 0; i < 2; i++ {
-		installAPK(apk, "smarttube.apk")
+		out := installAPK(apk, file)
+		if strings.Contains(out, "INSTALL_FAILED_UPDATE_INCOMPATIBLE") {
+			fmt.Println("Une autre version de " + name + ", signée autrement, est déjà installée.")
+			fmt.Println("La remplacer efface ses données (il faudra par exemple se reconnecter).")
+			if !yes("La remplacer ?", true) {
+				fmt.Println("  " + name + " laissé tel quel.")
+				return true
+			}
+			adb("uninstall", pkg)
+			installAPK(apk, file)
+		}
 		adb("connect", serial)
-		if strings.HasPrefix(sh("pm path "+smartTubePkg), "package:") {
-			fmt.Println("  SmartTube installé")
-			return
+		if strings.HasPrefix(sh("pm path "+pkg), "package:") {
+			fmt.Println("  " + name + " installé")
+			return true
 		}
 	}
-	fmt.Println("  SmartTube n'a pas pu être installé.")
+	fmt.Println("  " + name + " n'a pas pu être installé.")
+	return false
 }
 
 func pushHomeConf(conf string) {
@@ -761,5 +781,5 @@ func restore() {
 	if yes("Désinstaller aussi l'accueil cleantv ?", false) {
 		fmt.Println("  " + adb("uninstall", pkgHome))
 	}
-	fmt.Println("Restauration terminée. SmartTube et vos apps restent installés.")
+	fmt.Println("Restauration terminée. SmartTube, Cineflux et vos apps restent installés.")
 }

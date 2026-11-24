@@ -37,7 +37,7 @@ jobs:
       - name: apk
         env:
           DUMBTV_KEYPASS: ${{ secrets.CLEANTV_KEYPASS || 'dumbtvhome' }}
-        run: ./launcher/build.sh
+        run: ./launcher/build.sh && ./cineflux/build.sh
       - name: installers
         run: ./installer/build.sh
       - name: publish

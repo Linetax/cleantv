@@ -9,6 +9,7 @@ par un accueil simple et rapide : vos apps, vos entrées HDMI, rien d'autre.
 - Garde Alexa et le bouton vocal, sauf si vous choisissez de les couper.
 - Installe l'accueil cleantv et lui confie le bouton Home.
 - Installe SmartTube (YouTube sans pubs) et le place en premier sur l'accueil.
+- Installe Cineflux (si vous dites oui), juste après SmartTube.
 - Tout est réversible : relancez-le et choisissez « Tout restaurer ».
 
 ## Installation (Windows)
@@ -34,8 +35,8 @@ macOS et Linux : utilisez `cleantv-installer-macos` ou `cleantv-installer-linux`
 
 ## Compatibilité
 
-Fire OS 6, 7 et 8 (Fire TV Stick, Fire TV Cube, téléviseurs Fire TV Edition).
-Testé sur un Xiaomi TV F Pro 50 sous Fire OS 8.
+Fire OS 6, 7 et 8 (Fire TV Stick, Fire TV Stick 4K et 4K Max, Fire TV Cube, téléviseurs
+Fire TV Edition). Testé sur un Xiaomi TV F Pro 50 sous Fire OS 8.
 
 ## Bon à savoir
 
