@@ -34,10 +34,11 @@ got=$(sha256sum samsung/assets/tizenbrew.wgt | awk '{print $1}')
 
 go vet ./...
 go test ./...
-GOOS=windows GOARCH=amd64 go build -trimpath -ldflags=-s -o cleantv-installer.exe .
+# windowsgui: no console window, the installer opens its own window (ui/).
+GOOS=windows GOARCH=amd64 go build -trimpath -ldflags="-s -H windowsgui" -o cleantv-installer.exe .
 GOOS=linux GOARCH=amd64 go build -trimpath -ldflags=-s -o cleantv-installer-linux .
 GOOS=darwin GOARCH=arm64 go build -trimpath -ldflags=-s -o cleantv-installer-macos .
-GOOS=windows GOARCH=amd64 go build -trimpath -ldflags=-s -o cleantv-samsung.exe ./samsung
+GOOS=windows GOARCH=amd64 go build -trimpath -ldflags="-s -H windowsgui" -o cleantv-samsung.exe ./samsung
 GOOS=linux GOARCH=amd64 go build -trimpath -ldflags=-s -o cleantv-samsung-linux ./samsung
 GOOS=darwin GOARCH=arm64 go build -trimpath -ldflags=-s -o cleantv-samsung-macos ./samsung
 ls -l cleantv-installer* cleantv-samsung*

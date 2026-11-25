@@ -6,7 +6,6 @@ package main
 
 import (
 	"archive/zip"
-	"bufio"
 	"bytes"
 	"context"
 	"embed"
@@ -21,6 +20,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/Linetax/cleantv/installer/ui"
 )
 
 //go:embed assets
@@ -40,7 +41,6 @@ const (
 )
 
 var (
-	in      = bufio.NewReader(os.Stdin)
 	adbPath string
 	serial  string
 	sdk     int
@@ -48,12 +48,15 @@ var (
 
 func main() {
 	consoleUTF8()
-	fmt.Println("==============================================")
-	fmt.Println("  cleantv : une Fire TV propre, sans pubs")
-	fmt.Println("==============================================")
-	fmt.Println()
-	fmt.Println("Ce programme allège votre Fire TV et remplace son accueil.")
-	fmt.Println("Tout est réversible : relancez-le et choisissez « Tout restaurer ».")
+	ui.Start(ui.App{
+		Title:    "cleantv : une Fire TV propre, sans pubs",
+		Name:     "cleantv",
+		Tagline:  "Fire TV propre, sans pubs",
+		Features: []string{"Moins de pubs et de pistage", "SmartTube : YouTube sans pubs", "Un accueil simple et rapide", "Tout est réversible"},
+	})
+	ui.Say("")
+	ui.Say("Ce programme allège votre Fire TV et remplace son accueil.")
+	ui.Say("Tout est réversible : relancez-le et choisissez « Tout restaurer ».")
 
 	var err error
 	if adbPath, err = findAdb(); err != nil {
@@ -64,12 +67,12 @@ func main() {
 	detect()
 
 	for {
-		fmt.Println()
-		fmt.Println("Que voulez-vous faire ?")
-		fmt.Println("  1. Installer cleantv (accueil + allègement)")
-		fmt.Println("  2. Tout restaurer comme avant")
-		fmt.Println("  3. Quitter")
-		switch ask("Votre choix", "1") {
+		ui.Say("")
+		switch ui.Choose("Que voulez-vous faire ?", []string{
+			"Installer cleantv (accueil + allègement)",
+			"Tout restaurer comme avant",
+			"Quitter",
+		}, "1") {
 		case "1":
 			install()
 			finish()
@@ -82,56 +85,15 @@ func main() {
 	}
 }
 
-// ---------- console ----------
+// ---------- console or window (see ui/) ----------
 
-func ask(q, def string) string {
-	if def != "" {
-		fmt.Printf("%s [%s] : ", q, def)
-	} else {
-		fmt.Printf("%s : ", q)
-	}
-	line, err := in.ReadString('\n')
-	if err != nil && line == "" {
-		die("Entrée fermée.")
-	}
-	line = strings.TrimSpace(line)
-	if line == "" {
-		return def
-	}
-	return line
-}
-
-func yes(q string, def bool) bool {
-	d := "o/N"
-	if def {
-		d = "O/n"
-	}
-	for {
-		switch strings.ToLower(ask(q+" ("+d+")", "")) {
-		case "":
-			return def
-		case "o", "oui", "y", "yes":
-			return true
-		case "n", "non", "no":
-			return false
-		}
-	}
-}
-
-func step(title string) { fmt.Printf("\n--- %s ---\n", title) }
-
-func finish() {
-	fmt.Println()
-	ask("Appuyez sur Entrée pour fermer", "")
-	os.Exit(0)
-}
-
-func die(msg string) {
-	fmt.Println()
-	fmt.Println("ERREUR : " + msg)
-	ask("Appuyez sur Entrée pour fermer", "")
-	os.Exit(1)
-}
+var (
+	ask    = ui.Ask
+	yes    = ui.Yes
+	step   = ui.Step
+	finish = ui.Finish
+	die    = ui.Die
+)
 
 // ---------- adb ----------
 
@@ -162,9 +124,9 @@ func findAdb() (string, error) {
 		return "", fmt.Errorf("système %s non pris en charge", runtime.GOOS)
 	}
 	url := "https://dl.google.com/android/repository/platform-tools-latest-" + osName + ".zip"
-	fmt.Println()
-	fmt.Println("Téléchargement des outils ADB officiels de Google (une seule fois)...")
-	fmt.Println("  " + url)
+	ui.Say("")
+	ui.Say("Téléchargement des outils ADB officiels de Google (une seule fois)...")
+	ui.Say("  " + url)
 	data, err := download(url)
 	if err != nil {
 		return "", err
@@ -249,43 +211,43 @@ func sh(cmd string) string { return adb("shell", cmd) }
 
 func prepareTV() {
 	step("1. Préparer la TV")
-	fmt.Println("Sur la TV, avec la télécommande :")
-	fmt.Println("  a. Paramètres > Ma Fire TV > À propos")
-	fmt.Println("  b. Sélectionnez le nom de l'appareil (première ligne) et appuyez")
-	fmt.Println("     7 fois sur OK, jusqu'au message « Vous êtes un développeur ».")
-	fmt.Println("  c. Revenez en arrière : Paramètres > Ma Fire TV > Options pour les")
-	fmt.Println("     développeurs > Débogage ADB : Activé.")
-	fmt.Println("  d. Le PC et la TV doivent être sur le même réseau (même box).")
-	ask("Appuyez sur Entrée quand c'est fait", "")
+	ui.Say("Sur la TV, avec la télécommande :")
+	ui.Say("  a. Paramètres > Ma Fire TV > À propos")
+	ui.Say("  b. Sélectionnez le nom de l'appareil (première ligne) et appuyez")
+	ui.Say("     7 fois sur OK, jusqu'au message « Vous êtes un développeur ».")
+	ui.Say("  c. Revenez en arrière : Paramètres > Ma Fire TV > Options pour les")
+	ui.Say("     développeurs > Débogage ADB : Activé.")
+	ui.Say("  d. Le PC et la TV doivent être sur le même réseau (même box).")
+	ui.Pause("Appuyez sur Entrée quand c'est fait", "C'est fait")
 }
 
 func connect() {
 	step("2. Se connecter à la TV")
-	fmt.Println("L'adresse IP de la TV se trouve dans :")
-	fmt.Println("  Paramètres > Ma Fire TV > À propos > Réseau (ligne « Adresse IP »)")
+	ui.Say("L'adresse IP de la TV se trouve dans :")
+	ui.Say("  Paramètres > Ma Fire TV > À propos > Réseau (ligne « Adresse IP »)")
 	saved, _ := os.ReadFile(filepath.Join(appDir(), "last-ip"))
 	for {
 		target, ok := parseTarget(ask("Adresse IP de la TV (ex. 192.168.1.42)", strings.TrimSpace(string(saved))))
 		if !ok {
-			fmt.Println("Ce n'est pas une adresse IP valide. Elle ressemble à 192.168.1.42.")
+			ui.Say("Ce n'est pas une adresse IP valide. Elle ressemble à 192.168.1.42.")
 			continue
 		}
-		fmt.Println("Connexion à " + target + "... (gardez la TV allumée pendant toute l'installation)")
-		fmt.Println("Si la TV affiche « Autoriser le débogage USB ? », cochez « Toujours autoriser »")
-		fmt.Println("depuis cet ordinateur, puis choisissez OK.")
+		ui.Say("Connexion à " + target + "... (gardez la TV allumée pendant toute l'installation)")
+		ui.Say("Si la TV affiche « Autoriser le débogage USB ? », cochez « Toujours autoriser »")
+		ui.Say("depuis cet ordinateur, puis choisissez OK.")
 		if waitDevice(target) {
 			serial = target
 			_ = os.MkdirAll(appDir(), 0o755)
 			_ = os.WriteFile(filepath.Join(appDir(), "last-ip"), []byte(strings.TrimSuffix(target, ":5555")), 0o644)
-			fmt.Println("Connecté.")
+			ui.Say("Connecté.")
 			return
 		}
-		fmt.Println()
-		fmt.Println("Pas de connexion. Vérifiez :")
-		fmt.Println("  - que la TV est allumée et sur le même réseau ;")
-		fmt.Println("  - que « Débogage ADB » est bien activé ;")
-		fmt.Println("  - l'adresse IP ;")
-		fmt.Println("  - que vous avez accepté le message sur la TV.")
+		ui.Say("")
+		ui.Say("Pas de connexion. Vérifiez :")
+		ui.Say("  - que la TV est allumée et sur le même réseau ;")
+		ui.Say("  - que « Débogage ADB » est bien activé ;")
+		ui.Say("  - l'adresse IP ;")
+		ui.Say("  - que vous avez accepté le message sur la TV.")
 	}
 }
 
@@ -318,16 +280,16 @@ func waitDevice(target string) bool {
 		state := adb("-s", target, "get-state")
 		switch {
 		case state == "device":
-			fmt.Println()
+			ui.Say("")
 			return true
 		case strings.Contains(state, "unauthorized") && !warned:
-			fmt.Println(">> Acceptez le message affiché sur la TV (cochez « Toujours autoriser »).")
+			ui.Say(">> Acceptez le message affiché sur la TV (cochez « Toujours autoriser »).")
 			warned = true
 		}
-		fmt.Print(".")
+		ui.Print(".")
 		time.Sleep(time.Second)
 	}
-	fmt.Println()
+	ui.Say("")
 	return false
 }
 
@@ -340,7 +302,7 @@ func detect() {
 	}
 	model := sh("getprop ro.product.model")
 	maker := sh("getprop ro.product.manufacturer")
-	fmt.Printf("Appareil : %s %s, %s (Android sdk %d)\n", maker, model, fireOSName(), sdk)
+	ui.Sayf("Appareil : %s %s, %s (Android sdk %d)", maker, model, fireOSName(), sdk)
 	if !strings.Contains(sh("pm path com.amazon.tv.launcher"), "package:") {
 		die("Cet appareil n'est pas une Fire TV (Fire OS). cleantv ne fonctionne que sur Fire OS.")
 	}
@@ -415,7 +377,7 @@ func applySettings(file string) {
 			continue
 		}
 		sh("settings put " + f[0] + " " + f[1] + " " + f[2])
-		fmt.Printf("  %-46s %s\n", f[1], f[2])
+		ui.Sayf("  %-46s %s", f[1], f[2])
 	}
 }
 
@@ -448,17 +410,17 @@ func install() {
 		out := sh("pm disable-user --user 0 " + p)
 		switch {
 		case strings.Contains(out, "disabled-user"):
-			fmt.Printf("  %-46s désactivé\n", p)
+			ui.Sayf("  %-46s désactivé", p)
 			done++
 		case strings.Contains(out, "protected"):
-			fmt.Printf("  %-46s protégé par Amazon, laissé\n", p)
+			ui.Sayf("  %-46s protégé par Amazon, laissé", p)
 			protected++
 		default:
-			fmt.Printf("  %-46s non modifié : %s\n", p, firstLine(out))
+			ui.Sayf("  %-46s non modifié : %s", p, firstLine(out))
 			other++
 		}
 	}
-	fmt.Printf("Résultat : %d désactivés, %d déjà désactivés, %d protégés, %d non modifiés.\n", done, already, protected, other)
+	ui.Sayf("Résultat : %d désactivés, %d déjà désactivés, %d protégés, %d non modifiés.", done, already, protected, other)
 
 	step("Réglages de confidentialité")
 	applySettings("settings.txt")
@@ -486,11 +448,11 @@ func install() {
 	}
 
 	step("Terminé")
-	fmt.Println("Votre Fire TV est allégée et utilise l'accueil cleantv.")
-	fmt.Println("Spotify et vos autres apps s'installent depuis l'Appstore, comme d'habitude.")
+	ui.Say("Votre Fire TV est allégée et utilise l'accueil cleantv.")
+	ui.Say("Spotify et vos autres apps s'installent depuis l'Appstore, comme d'habitude.")
 	if yes("Redémarrer la TV maintenant ? (conseillé)", true) {
 		adb("reboot")
-		fmt.Println("La TV redémarre.")
+		ui.Say("La TV redémarre.")
 	}
 }
 
@@ -508,10 +470,10 @@ func installHome() {
 	}
 	out := installAPK(apk, "cleantv-home.apk")
 	if strings.Contains(out, "INSTALL_FAILED_UPDATE_INCOMPATIBLE") {
-		fmt.Println("Un ancien accueil dumbtv, signé autrement, est déjà installé.")
-		fmt.Println("Le remplacer efface ses réglages (ordre des apps, fond d'écran).")
+		ui.Say("Un ancien accueil dumbtv, signé autrement, est déjà installé.")
+		ui.Say("Le remplacer efface ses réglages (ordre des apps, fond d'écran).")
 		if !yes("Le remplacer ?", true) {
-			fmt.Println("Accueil laissé tel quel.")
+			ui.Say("Accueil laissé tel quel.")
 			return
 		}
 		adb("uninstall", pkgHome)
@@ -520,7 +482,7 @@ func installHome() {
 	if !strings.HasPrefix(sh("pm path "+pkgHome), "package:") {
 		die("l'installation de l'accueil a échoué : " + lastLine(out))
 	}
-	fmt.Println("  accueil installé")
+	ui.Say("  accueil installé")
 	sh("dumpsys deviceidle whitelist +" + pkgHome)
 
 	// Fire OS 6 refuses third-party accessibility services; its Keeper uses usage access instead.
@@ -528,7 +490,7 @@ func installHome() {
 		setGuard("")
 		sh("appops set " + pkgHome + " GET_USAGE_STATS allow")
 		startHome()
-		fmt.Println("  bouton Home : cleantv (mode Fire OS 6)")
+		ui.Say("  bouton Home : cleantv (mode Fire OS 6)")
 		return
 	}
 	sh("cmd package set-home-activity " + pkgHome + "/.Home")
@@ -541,13 +503,13 @@ func installHome() {
 		bound = strings.Contains(d, guardBind) || strings.Contains(d, guardRaw)
 	}
 	if !bound {
-		fmt.Println("  ATTENTION : Fire OS n'a pas activé le service du bouton Home.")
+		ui.Say("  ATTENTION : Fire OS n'a pas activé le service du bouton Home.")
 		if strings.Contains(sh("logcat -d -b all"), "A11yAuthorizer") {
-			fmt.Println("  Cette version de Fire OS n'accepte que les services approuvés par Amazon :")
-			fmt.Println("  l'accueil cleantv reste installé comme une app, mais Home ouvre l'accueil Amazon.")
+			ui.Say("  Cette version de Fire OS n'accepte que les services approuvés par Amazon :")
+			ui.Say("  l'accueil cleantv reste installé comme une app, mais Home ouvre l'accueil Amazon.")
 		}
 	} else {
-		fmt.Println("  bouton Home : cleantv")
+		ui.Say("  bouton Home : cleantv")
 	}
 	startHome()
 }
@@ -583,10 +545,10 @@ func installApp(name, pkg, file string) bool {
 	for i := 0; i < 2; i++ {
 		out := installAPK(apk, file)
 		if strings.Contains(out, "INSTALL_FAILED_UPDATE_INCOMPATIBLE") {
-			fmt.Println("Une autre version de " + name + ", signée autrement, est déjà installée.")
-			fmt.Println("La remplacer efface ses données (il faudra par exemple se reconnecter).")
+			ui.Say("Une autre version de " + name + ", signée autrement, est déjà installée.")
+			ui.Say("La remplacer efface ses données (il faudra par exemple se reconnecter).")
 			if !yes("La remplacer ?", true) {
-				fmt.Println("  " + name + " laissé tel quel.")
+				ui.Say("  " + name + " laissé tel quel.")
 				return true
 			}
 			adb("uninstall", pkg)
@@ -594,11 +556,11 @@ func installApp(name, pkg, file string) bool {
 		}
 		adb("connect", serial)
 		if strings.HasPrefix(sh("pm path "+pkg), "package:") {
-			fmt.Println("  " + name + " installé")
+			ui.Say("  " + name + " installé")
 			return true
 		}
 	}
-	fmt.Println("  " + name + " n'a pas pu être installé.")
+	ui.Say("  " + name + " n'a pas pu être installé.")
 	return false
 }
 
@@ -611,7 +573,7 @@ func pushHomeConf(conf string) {
 	sh("mkdir -p " + homeMedia)
 	adb("push", tmp, homeMedia+"/home.conf")
 	startHome()
-	fmt.Println("  SmartTube placé en premier sur l'accueil")
+	ui.Say("  SmartTube placé en premier sur l'accueil")
 }
 
 // ---------- HOME takeover helpers (ported from launcher/install.sh and scripts/home.sh) ----------
@@ -762,10 +724,10 @@ func restore() {
 		if sdk >= 28 {
 			sh("appops set " + p + " RUN_ANY_IN_BACKGROUND allow")
 		}
-		fmt.Printf("  %-46s réactivé\n", p)
+		ui.Sayf("  %-46s réactivé", p)
 		n++
 	}
-	fmt.Printf("%d services réactivés.\n", n)
+	ui.Sayf("%d services réactivés.", n)
 
 	step("Réglages d'origine")
 	applySettings("settings.restore.txt")
@@ -777,9 +739,9 @@ func restore() {
 	setGuard("")
 	sh("dumpsys deviceidle whitelist -" + pkgHome)
 	sh("am start -a android.intent.action.MAIN -c android.intent.category.HOME")
-	fmt.Println("  le bouton Home ouvre de nouveau l'accueil Amazon")
+	ui.Say("  le bouton Home ouvre de nouveau l'accueil Amazon")
 	if yes("Désinstaller aussi l'accueil cleantv ?", false) {
-		fmt.Println("  " + adb("uninstall", pkgHome))
+		ui.Say("  " + adb("uninstall", pkgHome))
 	}
-	fmt.Println("Restauration terminée. SmartTube, Cineflux et vos apps restent installés.")
+	ui.Say("Restauration terminée. SmartTube, Cineflux et vos apps restent installés.")
 }

@@ -2,3 +2,5 @@ assets/
 *.exe
 cleantv-installer*
 cleantv-samsung*
+e2e/node_modules/
+e2e/shots/

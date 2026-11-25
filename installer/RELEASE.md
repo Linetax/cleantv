@@ -18,7 +18,8 @@ par un accueil simple et rapide : vos apps, vos entrées HDMI, rien d'autre.
 2. Double-cliquez dessus. Windows affiche un avertissement SmartScreen car le fichier
    n'est pas signé : cliquez sur « Informations complémentaires », puis
    « Exécuter quand même ».
-3. Suivez l'assistant. Il vous explique :
+3. Une fenêtre s'ouvre (elle utilise Microsoft Edge, déjà présent sur Windows).
+   Suivez l'assistant, étape par étape, avec de gros boutons. Il vous explique :
    - comment activer le **débogage ADB** sur la TV
      (Paramètres > Ma Fire TV > À propos : appuyez 7 fois sur le nom de l'appareil,
      puis Options pour les développeurs > Débogage ADB) ;

@@ -6,15 +6,15 @@
 package main
 
 import (
-	"bufio"
 	_ "embed"
-	"fmt"
 	"net"
 	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/Linetax/cleantv/installer/ui"
 )
 
 //go:embed assets/tizenbrew.wgt
@@ -26,17 +26,18 @@ const (
 	remoteWgt    = "/home/owner/share/tmp/sdk_tools/package.wgt"
 )
 
-var in = bufio.NewReader(os.Stdin)
-
 func main() {
 	consoleUTF8()
-	fmt.Println("==============================================")
-	fmt.Println("  cleantv Samsung : YouTube sans pubs")
-	fmt.Println("==============================================")
-	fmt.Println()
-	fmt.Println("Ce programme installe TizenBrew sur votre TV Samsung. TizenBrew contient")
-	fmt.Println("TizenTube : YouTube sans pubs, qui saute les passages sponsorisés.")
-	fmt.Println("Rien n'est supprimé de la TV. Pour l'enlever : Apps > TizenBrew > Supprimer.")
+	ui.Start(ui.App{
+		Title:    "cleantv Samsung : YouTube sans pubs",
+		Name:     "cleantv Samsung",
+		Tagline:  "YouTube sans pubs sur TV Samsung",
+		Features: []string{"TizenTube : YouTube sans pubs", "Saute les passages sponsorisés", "Rien n'est supprimé de la TV"},
+	})
+	ui.Say("")
+	ui.Say("Ce programme installe TizenBrew sur votre TV Samsung. TizenBrew contient")
+	ui.Say("TizenTube : YouTube sans pubs, qui saute les passages sponsorisés.")
+	ui.Say("Rien n'est supprimé de la TV. Pour l'enlever : Apps > TizenBrew > Supprimer.")
 
 	prepareTV()
 	s := connect()
@@ -48,38 +49,14 @@ func main() {
 	finish()
 }
 
-// ---------- console ----------
+// ---------- console or window (see ../ui/) ----------
 
-func ask(q, def string) string {
-	if def != "" {
-		fmt.Printf("%s [%s] : ", q, def)
-	} else {
-		fmt.Printf("%s : ", q)
-	}
-	line, err := in.ReadString('\n')
-	if err != nil && line == "" {
-		die("Entrée fermée.")
-	}
-	if line = strings.TrimSpace(line); line == "" {
-		return def
-	}
-	return line
-}
-
-func step(title string) { fmt.Printf("\n--- %s ---\n", title) }
-
-func finish() {
-	fmt.Println()
-	ask("Appuyez sur Entrée pour fermer", "")
-	os.Exit(0)
-}
-
-func die(msg string) {
-	fmt.Println()
-	fmt.Println("ERREUR : " + msg)
-	ask("Appuyez sur Entrée pour fermer", "")
-	os.Exit(1)
-}
+var (
+	ask    = ui.Ask
+	step   = ui.Step
+	finish = ui.Finish
+	die    = ui.Die
+)
 
 func appDir() string {
 	d, err := os.UserCacheDir()
@@ -107,45 +84,45 @@ func prepareTV() {
 	if pc == "" {
 		pc = "(introuvable : voir ipconfig)"
 	}
-	fmt.Println("Le PC et la TV doivent être sur le même réseau (même box).")
-	fmt.Println("Sur la TV, avec la télécommande :")
-	fmt.Println("  a. Bouton Accueil, puis ouvrez « Apps » (en plein écran, pas la barre).")
-	fmt.Println("  b. Tapez 1 2 3 4 5. Sans touches chiffres : bouton « 123 » de la")
-	fmt.Println("     télécommande, ou la télécommande de l'appli SmartThings du téléphone.")
-	fmt.Println("     Rien ne s'affiche pendant la saisie, c'est normal.")
-	fmt.Println("  c. Dans la fenêtre « Developer mode » : mettez On.")
-	fmt.Println("     Host PC IP : tapez l'adresse de ce PC : " + pc)
-	fmt.Println("  d. OK, puis redémarrez la TV : maintenez le bouton marche de la")
-	fmt.Println("     télécommande jusqu'au logo Samsung.")
-	ask("Appuyez sur Entrée quand la TV a redémarré", "")
+	ui.Say("Le PC et la TV doivent être sur le même réseau (même box).")
+	ui.Say("Sur la TV, avec la télécommande :")
+	ui.Say("  a. Bouton Accueil, puis ouvrez « Apps » (en plein écran, pas la barre).")
+	ui.Say("  b. Tapez 1 2 3 4 5. Sans touches chiffres : bouton « 123 » de la")
+	ui.Say("     télécommande, ou la télécommande de l'appli SmartThings du téléphone.")
+	ui.Say("     Rien ne s'affiche pendant la saisie, c'est normal.")
+	ui.Say("  c. Dans la fenêtre « Developer mode » : mettez On.")
+	ui.Say("     Host PC IP : tapez l'adresse de ce PC : " + pc)
+	ui.Say("  d. OK, puis redémarrez la TV : maintenez le bouton marche de la")
+	ui.Say("     télécommande jusqu'au logo Samsung.")
+	ui.Pause("Appuyez sur Entrée quand la TV a redémarré", "La TV a redémarré")
 }
 
 func connect() *sdb {
 	step("2. Se connecter à la TV")
-	fmt.Println("L'adresse IP de la TV se trouve dans :")
-	fmt.Println("  Paramètres > Général > Réseau > État du réseau > Paramètres IP")
+	ui.Say("L'adresse IP de la TV se trouve dans :")
+	ui.Say("  Paramètres > Général > Réseau > État du réseau > Paramètres IP")
 	saved, _ := os.ReadFile(filepath.Join(appDir(), "last-samsung-ip"))
 	for {
 		ip, ok := parseIP(ask("Adresse IP de la TV (ex. 192.168.1.42)", strings.TrimSpace(string(saved))))
 		if !ok {
-			fmt.Println("Ce n'est pas une adresse IP valide. Elle ressemble à 192.168.1.42.")
+			ui.Say("Ce n'est pas une adresse IP valide. Elle ressemble à 192.168.1.42.")
 			continue
 		}
-		fmt.Println("Connexion à " + ip + "...")
+		ui.Say("Connexion à " + ip + "...")
 		s, err := dialSDB(ip)
 		if err == nil {
 			_ = os.MkdirAll(appDir(), 0o755)
 			_ = os.WriteFile(filepath.Join(appDir(), "last-samsung-ip"), []byte(ip), 0o644)
-			fmt.Println("Connecté.")
+			ui.Say("Connecté.")
 			return s
 		}
-		fmt.Println()
-		fmt.Println("Pas de connexion (" + err.Error() + "). Vérifiez :")
-		fmt.Println("  - que la TV est allumée et sur le même réseau ;")
-		fmt.Println("  - que le mode développeur est sur On, avec l'IP de ce PC ;")
-		fmt.Println("  - que la TV a bien été redémarrée depuis (bouton marche maintenu) ;")
-		fmt.Println("  - l'adresse IP de la TV ;")
-		fmt.Println("  - que le pare-feu Windows laisse passer ce programme.")
+		ui.Say("")
+		ui.Say("Pas de connexion (" + err.Error() + "). Vérifiez :")
+		ui.Say("  - que la TV est allumée et sur le même réseau ;")
+		ui.Say("  - que le mode développeur est sur On, avec l'IP de ce PC ;")
+		ui.Say("  - que la TV a bien été redémarrée depuis (bouton marche maintenu) ;")
+		ui.Say("  - l'adresse IP de la TV ;")
+		ui.Say("  - que le pare-feu Windows laisse passer ce programme.")
 	}
 }
 
@@ -167,27 +144,27 @@ func checkVersion(s *sdb) {
 	v, err := s.platformVersion()
 	switch major := tizenMajor(v); {
 	case err != nil || major == 0:
-		fmt.Println("Version de Tizen inconnue, on essaie quand même.")
+		ui.Say("Version de Tizen inconnue, on essaie quand même.")
 	case major < 3:
 		die("Tizen " + v + " : trop ancien (TV d'avant 2017). TizenBrew demande Tizen 3 ou plus.")
 	case major >= 7:
-		fmt.Println("Tizen " + v + " (TV de 2023 ou plus récente).")
+		ui.Say("Tizen " + v + " (TV de 2023 ou plus récente).")
 		die("Sur Tizen 7 et plus, il faut un certificat Samsung lié à un compte Samsung.\n" +
 			"Ce programme ne le fait pas. Utilisez TizenBrew Installer :\n" +
 			"  https://github.com/reisxd/TizenBrewInstaller/releases/latest")
 	default:
-		fmt.Println("Tizen " + v + " : compatible.")
+		ui.Say("Tizen " + v + " : compatible.")
 	}
 }
 
 func install(s *sdb) {
 	step("3. Installer TizenBrew")
-	fmt.Printf("Envoi de TizenBrew à la TV (%d Ko)...\n", len(tizenbrew)/1024)
+	ui.Sayf("Envoi de TizenBrew à la TV (%d Ko)...", len(tizenbrew)/1024)
 	s.deadline(5 * time.Minute)
 	if err := s.push(remoteWgt, tizenbrew); err != nil {
 		die("Envoi impossible : " + err.Error())
 	}
-	fmt.Println("Installation sur la TV (jusqu'à une minute)...")
+	ui.Say("Installation sur la TV (jusqu'à une minute)...")
 	out, err := s.shell("0 vd_appinstall "+tizenbrewPkg+" "+remoteWgt, func(o string) bool {
 		return strings.Contains(o, "spend time")
 	})
@@ -196,10 +173,10 @@ func install(s *sdb) {
 		die("Installation interrompue : " + err.Error() + "\n" + out)
 	}
 	if !ok {
-		fmt.Println(strings.TrimSpace(out))
+		ui.Say(strings.TrimSpace(out))
 		die(msg)
 	}
-	fmt.Println("TizenBrew est installé.")
+	ui.Say("TizenBrew est installé.")
 }
 
 // installResult reads what wascmd printed. Error 118 is Tizen's generic install failure:
@@ -222,22 +199,22 @@ func installResult(out string) (bool, string) {
 
 func afterInstall() {
 	step("4. Dernier réglage sur la TV")
-	fmt.Println("TizenBrew a besoin du mode développeur, mais plus de ce PC :")
-	fmt.Println("  a. Apps, puis 1 2 3 4 5 comme tout à l'heure.")
-	fmt.Println("  b. Laissez Developer mode sur On, remplacez Host PC IP par 127.0.0.1, OK.")
-	fmt.Println("  c. Redémarrez la TV (bouton marche maintenu jusqu'au logo).")
-	fmt.Println("  d. Ouvrez TizenBrew dans Apps, puis choisissez TizenTube.")
-	fmt.Println("Astuce : dans Apps, sur TizenBrew, maintenez OK > « Ajouter à l'accueil »")
-	fmt.Println("et placez-le en premier.")
+	ui.Say("TizenBrew a besoin du mode développeur, mais plus de ce PC :")
+	ui.Say("  a. Apps, puis 1 2 3 4 5 comme tout à l'heure.")
+	ui.Say("  b. Laissez Developer mode sur On, remplacez Host PC IP par 127.0.0.1, OK.")
+	ui.Say("  c. Redémarrez la TV (bouton marche maintenu jusqu'au logo).")
+	ui.Say("  d. Ouvrez TizenBrew dans Apps, puis choisissez TizenTube.")
+	ui.Say("Astuce : dans Apps, sur TizenBrew, maintenez OK > « Ajouter à l'accueil »")
+	ui.Say("et placez-le en premier.")
 }
 
 func tips() {
 	step("Pour aller plus loin (facultatif, à faire à la main)")
-	fmt.Println("Samsung ne permet pas d'enlever ses applis ni son accueil (pas d'accès comme")
-	fmt.Println("sur Fire TV). Deux réglages réduisent quand même pubs et pistage :")
-	fmt.Println("  - Démarrer sur la dernière source au lieu de l'accueil Smart Hub :")
-	fmt.Println("    Paramètres > Général > Fonctions Smart > Exécution auto Smart Hub : Off.")
-	fmt.Println("  - Bloquer les pubs de l'accueil : Paramètres > Général > Réseau > État du")
-	fmt.Println("    réseau > Paramètres IP > DNS : saisie manuelle 94.140.14.14 (AdGuard DNS).")
-	fmt.Println("Les noms des menus varient un peu selon l'année de la TV.")
+	ui.Say("Samsung ne permet pas d'enlever ses applis ni son accueil (pas d'accès comme")
+	ui.Say("sur Fire TV). Deux réglages réduisent quand même pubs et pistage :")
+	ui.Say("  - Démarrer sur la dernière source au lieu de l'accueil Smart Hub :")
+	ui.Say("    Paramètres > Général > Fonctions Smart > Exécution auto Smart Hub : Off.")
+	ui.Say("  - Bloquer les pubs de l'accueil : Paramètres > Général > Réseau > État du")
+	ui.Say("    réseau > Paramètres IP > DNS : saisie manuelle 94.140.14.14 (AdGuard DNS).")
+	ui.Say("Les noms des menus varient un peu selon l'année de la TV.")
 }
