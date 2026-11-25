@@ -72,6 +72,10 @@ async function fireInstall(browser) {
   await click(page, "Commencer");
   await visible(page, "Préparer la TV");
   await shot(page, "firetv-preparer");
+  await page.locator(".art img").click();
+  await page.locator(".zoom").waitFor();
+  await shot(page, "firetv-preparer-agrandi");
+  await page.locator(".zoom").click();
   await click(page, "C'est fait");
   await page.locator("#answer").waitFor();
   await page.fill("#answer", "192.168.1");

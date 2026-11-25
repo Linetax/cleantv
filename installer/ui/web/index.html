@@ -155,10 +155,12 @@ p { margin: 0 0 10px; color: var(--soft); }
 .art {
   border-radius: 18px; border: 1px solid var(--line); overflow: hidden;
   background: linear-gradient(160deg, #171A26, #11131C);
-  aspect-ratio: 4 / 5; display: grid; place-items: center; position: sticky; top: 0;
+  display: grid; place-items: center;
 }
-.art img { width: 100%; height: 100%; object-fit: cover; }
-.art svg { width: 82%; }
+.art img { display: block; width: 100%; height: auto; cursor: zoom-in; }
+.art svg { width: 82%; margin: 12% 0; }
+.zoom { position: fixed; inset: 0; z-index: 8; background: rgba(8, 9, 14, .92); overflow: auto; cursor: zoom-out; padding: 24px; animation: in .2s ease both; }
+.zoom img { display: block; width: min(960px, 100%); margin: 0 auto; border-radius: 12px; }
 
 /* actions */
 .actions { display: flex; gap: 12px; align-items: center; margin-top: 28px; flex-wrap: wrap; }
@@ -525,7 +527,7 @@ function question(m, p, app) {
 // art shows img/<app>-<step>.svg (or .png) beside the instructions, else the generic drawing.
 function art(app, title) {
   const base = `img/${slug(app.name)}-${slug(title)}`;
-  return `<div class="art"><img src="${base}.svg" alt="" onerror="if(!this.dataset.png){this.dataset.png=1;this.src='${base}.png'}else this.parentNode.innerHTML=ART"></div>`;
+  return `<div class="art"><img src="${base}.svg" alt="" title="Cliquer pour agrandir" onerror="if(!this.dataset.png){this.dataset.png=1;this.src='${base}.png'}else this.parentNode.innerHTML=ART"></div>`;
 }
 
 function busy(m) {
@@ -593,6 +595,15 @@ function wire(view, m) {
   if (f) f.onsubmit = (e) => { e.preventDefault(); answer(m.pending, $("#answer").value.trim()); };
   const start = view.querySelector('[data-act="start"]');
   if (start) start.onclick = () => { st.started = true; draw(); };
+  const pic = view.querySelector(".art img");
+  if (pic) pic.onclick = () => {
+    // Full size, to read the TV screens; any click closes it.
+    const z = document.createElement("div");
+    z.className = "zoom";
+    z.innerHTML = `<img src="${pic.currentSrc || pic.src}" alt="">`;
+    z.onclick = () => z.remove();
+    document.body.append(z);
+  };
   const close = view.querySelector('[data-act="close"]');
   if (close) close.onclick = () => {
     navigator.sendBeacon("/api/bye?t=" + T);
