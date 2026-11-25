@@ -24,16 +24,21 @@ check() { # check NAME CONDITION...
   if "$@"; then echo "ok    $name"; else echo "FAIL  $name"; fails=$((fails + 1)); fi
 }
 
-# Answers: Enter (TV ready), IP, menu choice, then the questions of that path, then Enter to close.
+# Answers: Enter (TV ready), IP, menu choice, then the questions of that path (install: Alexa,
+# Cineflux, ..., reboot), then Enter to close.
 IP='203.0.113.7'
 
-run fireos8 "\n$IP\n1\n\nn\n\n"
+run fireos8 "\n$IP\n1\n\n\nn\n\n"
 check "fire os 8: disables an ad package" has "$log" "pm disable-user --user 0 com.amazon.hybridadidservice"
 check "fire os 8: never touches Amazon's launcher" bash -c '! grep -q "disable-user --user 0 com.amazon.tv.launcher" <<<"$0"' "$log"
 check "fire os 8: installs SmartTube before the home screen" bash -c 'grep -n "install -r" <<<"$0" | head -1 | grep -q smarttube' "$log"
 check "fire os 8: takes over HOME" has "$out" "bouton Home : cleantv"
 check "fire os 8: alarm min_futurity=0" has "$log" "alarm_manager_constants min_futurity=0"
-check "fire os 8: SmartTube first on a fresh home screen" has "$pushed" "apps.order=org.smarttube.stable"
+check "fire os 8: installs Cineflux" has "$out" "Cineflux installÃ©"
+check "fire os 8: SmartTube then Cineflux on a fresh home screen" has "$pushed" "apps.order=org.smarttube.stable,party.linetax.cineflux"
+
+run fireos8 "\n$IP\n1\n\nn\nn\n\n"
+check "Cineflux declined: not installed" bash -c '! grep -q cineflux <<<"$0"' "$log"
 
 run slowauth "\n$IP\n3\n\n"
 check "slow authorization: asks to accept on the TV" has "$out" "Acceptez le message"
@@ -49,11 +54,12 @@ check "TV that hangs adb: gives up with a clear message" has "$out" "La TV ne rÃ
 run notfire "\n$IP\n\n"
 check "not Fire OS: refused" has "$out" "pas une Fire TV"
 
-run oldkey "\n$IP\n1\n\n\nn\n\n"
+run oldkey "\n$IP\n1\n\n\n\n\nn\n\n"
 check "home screen signed with another key: replaced after asking" has "$log" "uninstall tv.dumbtv.home"
 check "home screen signed with another key: order left alone" test -z "$pushed"
+check "Cineflux signed with another key: replaced after asking" has "$log" "uninstall party.linetax.cineflux"
 
-run fireos6 "\n$IP\n1\n\nn\n\n"
+run fireos6 "\n$IP\n1\n\n\nn\n\n"
 check "fire os 6: usage-access mode" has "$out" "mode Fire OS 6"
 check "fire os 6: no accessibility takeover" bash -c '! grep -q "set-home-activity" <<<"$0"' "$log"
 

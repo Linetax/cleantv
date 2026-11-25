@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Builds cleantv-installer.exe (and Linux/macOS binaries) with the package lists, the
-# launcher APK and SmartTube embedded. Needs Go and launcher/build/dumbtv-home.apk
-# (./launcher/build.sh). SmartTube is downloaded unless SMARTTUBE points at a local copy.
+# launcher APK, Cineflux and SmartTube embedded. Needs Go, launcher/build/dumbtv-home.apk
+# (./launcher/build.sh) and cineflux/build/cineflux.apk (./cineflux/build.sh). SmartTube is downloaded unless SMARTTUBE points at a local copy.
 set -euo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")"
 APK=${APK:-../launcher/build/dumbtv-home.apk}
@@ -9,6 +9,9 @@ APK=${APK:-../launcher/build/dumbtv-home.apk}
 rm -rf assets && mkdir -p assets
 cp -r ../data/fireos ../data/fireos6 assets/
 cp "$APK" assets/dumbtv-home.apk
+CINEFLUX=${CINEFLUX:-../cineflux/build/cineflux.apk}
+[[ -f $CINEFLUX ]] || { echo "error: $CINEFLUX missing — run ./cineflux/build.sh first" >&2; exit 1; }
+cp "$CINEFLUX" assets/cineflux.apk
 
 # Pinned: releases are immutable, the hash identifies the build. Universal runs on 32- and
 # 64-bit Fire OS alike.

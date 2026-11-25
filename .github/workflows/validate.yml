@@ -37,7 +37,7 @@ jobs:
       - name: build (sdk 25 for fire os 6-8; fails on any android.* API that Android 7.1 lacks)
         env:
           DUMBTV_KEYPASS: ${{ secrets.CLEANTV_KEYPASS || 'dumbtvhome' }}
-        run: ./launcher/build.sh
+        run: ./launcher/build.sh && ./cineflux/build.sh
       - name: upload the apk (install with ./launcher/install.sh --apk dumbtv-home.apk)
         uses: actions/upload-artifact@v4
         with:
