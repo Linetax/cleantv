@@ -34,7 +34,7 @@ random token) and opens it in an Edge app window (Chrome, then the default brows
 fallbacks); the program ends when the window closes. The page draws every screen from
 what the installer prints and asks, so the logic in `main.go` is the same in both modes.
 `--console` keeps the old terminal mode (Linux/macOS; `e2e/run.sh` uses it). A picture
-named `ui/web/img/<app>-<step>.png` (e.g. `cleantv-preparer-la-tv.png`) replaces the
+named `ui/web/img/<app>-<step>.svg` or `.png` (e.g. `cleantv-preparer-la-tv.svg`) replaces the
 drawing next to that step's instructions. `e2e/gui.cjs` drives both windows in Chrome
 against fake TVs and saves a screenshot of each screen.
 

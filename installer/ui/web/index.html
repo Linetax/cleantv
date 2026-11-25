@@ -103,7 +103,7 @@ h2 { font-size: 16px; font-weight: 600; margin: 0 0 10px; }
 p { margin: 0 0 10px; color: var(--soft); }
 .lead { font-size: 16.5px; color: var(--soft); max-width: 620px; }
 .grow { flex: 1; }
-.cols { display: grid; grid-template-columns: 1fr 230px; gap: 32px; align-items: start; }
+.cols { display: grid; grid-template-columns: 1fr 290px; gap: 32px; align-items: start; }
 
 /* instruction cards */
 .items { display: grid; gap: 10px; margin: 14px 0 6px; }
@@ -469,10 +469,9 @@ function question(m, p, app) {
   const title = m.step ? clean(m.step.title) : "";
   const since = m.linesFrom(Math.max(m.lastAnswer + 1, m.step && p.kind !== "choice" ? m.step.at + 1 : 0));
   if (p.kind === "pause") {
-    const img = `img/${slug(app.name)}-${slug(title)}.png`;
     return `<section class="screen"><div class="eyebrow grad">Étape ${m.steps.length}</div><h1>${esc(title)}</h1>
       <div class="cols"><div>${render(since)}</div>
-      <div class="art"><img src="${img}" alt="" onerror="this.parentNode.innerHTML=ART"></div></div>
+      ${art(app, title)}</div>
       <div class="grow"></div>
       <div class="actions sticky"><button class="btn primary big" data-answer="" autofocus>${esc(p.button || "Continuer")} ${ICONS.arrow}</button></div>
     </section>`;
@@ -487,11 +486,12 @@ function question(m, p, app) {
     const label = lm ? lm[1] : p.text, ph = lm ? lm[2] : "";
     const problem = fresh.filter((l) => !/^Connexion à |^Si la TV affiche|^depuis cet ordinateur/.test(l));
     return `<section class="screen"><div class="eyebrow grad">Étape ${m.steps.length}</div><h1>${esc(title)}</h1>
-      ${render(base)}
+      <div class="cols"><div>${render(base)}
       ${problem.length ? `<div class="callout warn">${ICONS.warn}<div class="body">${render(problem)}</div></div>` : ""}
       <form class="field" data-form><label for="answer">${esc(label)}</label>
       <input id="answer" autocomplete="off" spellcheck="false" inputmode="decimal" placeholder="${esc(ph)}" value="${esc(p.def || "")}" autofocus>
-      <div class="actions"><button class="btn primary big" type="submit">Continuer ${ICONS.arrow}</button></div></form>
+      <div class="actions"><button class="btn primary big" type="submit">Continuer ${ICONS.arrow}</button></div></form></div>
+      ${art(app, title)}</div>
     </section>`;
   }
   if (p.kind === "choice") {
@@ -520,6 +520,12 @@ function question(m, p, app) {
     <h1>${esc(q)}</h1>
     <div class="yesno">${btn("oui", "Oui", ICONS.yes)}${btn("non", "Non", ICONS.no)}</div>
   </section>`;
+}
+
+// art shows img/<app>-<step>.svg (or .png) beside the instructions, else the generic drawing.
+function art(app, title) {
+  const base = `img/${slug(app.name)}-${slug(title)}`;
+  return `<div class="art"><img src="${base}.svg" alt="" onerror="if(!this.dataset.png){this.dataset.png=1;this.src='${base}.png'}else this.parentNode.innerHTML=ART"></div>`;
 }
 
 function busy(m) {
