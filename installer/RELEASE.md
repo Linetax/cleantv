@@ -38,9 +38,28 @@ macOS et Linux : utilisez `cleantv-installer-macos` ou `cleantv-installer-linux`
 Fire OS 6, 7 et 8 (Fire TV Stick, Fire TV Stick 4K et 4K Max, Fire TV Cube, téléviseurs
 Fire TV Edition). Testé sur un Xiaomi TV F Pro 50 sous Fire OS 8.
 
+## TV Samsung : cleantv-samsung.exe
+
+Installe **TizenBrew**, qui contient **TizenTube** (YouTube sans pubs, saute les
+passages sponsorisés). Pour les Samsung de 2017 à 2022 (Tizen 3 à 6). Les modèles
+2023 et plus récents (Tizen 7+) demandent un compte Samsung : utilisez
+[TizenBrew Installer](https://github.com/reisxd/TizenBrewInstaller/releases/latest).
+
+1. Téléchargez **cleantv-samsung.exe** ci-dessous et lancez-le (même avertissement
+   SmartScreen que plus haut).
+2. Il explique comment activer le mode développeur (Apps, puis 12345) avec l'adresse
+   du PC, se connecte à la TV et installe TizenBrew.
+3. À la fin, remettez l'adresse du mode développeur sur 127.0.0.1, redémarrez la TV et
+   ouvrez TizenBrew, puis TizenTube.
+
+Samsung ne permet pas d'enlever ses applis ni de changer l'accueil : il n'y a pas
+d'allègement comme sur Fire TV. L'assistant indique deux réglages manuels qui aident
+(démarrage sans Smart Hub, DNS bloqueur de pubs).
+
 ## Bon à savoir
 
 - Une mise à jour de Fire OS peut réactiver des services : relancez l'installateur.
 - Une réinitialisation d'usine efface toutes les modifications.
 - Basé sur [dumbtv](https://github.com/humblemuzzu/dumbtv) (licence MIT).
-- À utiliser à vos risques. Projet non affilié à Amazon.
+- TizenBrew et TizenTube : projets de [reisxd](https://github.com/reisxd/TizenBrew) (GPL-3.0), intégrés sans modification.
+- À utiliser à vos risques. Projet non affilié à Amazon ni à Samsung.
