@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Builds cleantv-installer.exe (and Linux/macOS binaries) with the package lists, the
-# launcher APK, Cineflux and SmartTube embedded. Needs Go, launcher/build/dumbtv-home.apk
+# launcher APK, Cineflux and SmartTube embedded, and cleantv-samsung.exe with TizenBrew. Needs Go, launcher/build/dumbtv-home.apk
 # (./launcher/build.sh) and cineflux/build/cineflux.apk (./cineflux/build.sh). SmartTube is downloaded unless SMARTTUBE points at a local copy.
 set -euo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")"
@@ -21,9 +21,23 @@ if [[ -n ${SMARTTUBE:-} ]]; then cp "$SMARTTUBE" assets/smarttube.apk
 else curl -fsSL --retry 4 --retry-all-errors -o assets/smarttube.apk "$ST_URL"; fi
 got=$(sha256sum assets/smarttube.apk | awk '{print $1}')
 [[ $got == "$ST_SHA" ]] || { echo "error: SmartTube checksum mismatch (got $got)" >&2; exit 1; }
+
+# TizenBrew for Tizen 3 to 6 (the only widget its releases ship; signed with the public
+# Tizen SDK distributor key, so no Samsung account is needed). It bundles TizenTube.
+TB_URL=https://github.com/reisxd/TizenBrew/releases/download/v2.0.5/TizenBrewStandalone-Old.wgt
+TB_SHA=4ff4f1d7e400b13ab40e56d928c714e0a0858a818ada180f6c90719398503fbc
+mkdir -p samsung/assets
+if [[ -n ${TIZENBREW:-} ]]; then cp "$TIZENBREW" samsung/assets/tizenbrew.wgt
+else curl -fsSL --retry 4 --retry-all-errors -o samsung/assets/tizenbrew.wgt "$TB_URL"; fi
+got=$(sha256sum samsung/assets/tizenbrew.wgt | awk '{print $1}')
+[[ $got == "$TB_SHA" ]] || { echo "error: TizenBrew checksum mismatch (got $got)" >&2; exit 1; }
+
 go vet ./...
 go test ./...
 GOOS=windows GOARCH=amd64 go build -trimpath -ldflags=-s -o cleantv-installer.exe .
 GOOS=linux GOARCH=amd64 go build -trimpath -ldflags=-s -o cleantv-installer-linux .
 GOOS=darwin GOARCH=arm64 go build -trimpath -ldflags=-s -o cleantv-installer-macos .
-ls -l cleantv-installer*
+GOOS=windows GOARCH=amd64 go build -trimpath -ldflags=-s -o cleantv-samsung.exe ./samsung
+GOOS=linux GOARCH=amd64 go build -trimpath -ldflags=-s -o cleantv-samsung-linux ./samsung
+GOOS=darwin GOARCH=arm64 go build -trimpath -ldflags=-s -o cleantv-samsung-macos ./samsung
+ls -l cleantv-installer* cleantv-samsung*

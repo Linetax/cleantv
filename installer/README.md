@@ -23,4 +23,10 @@ The APK is signed with the key in the `CLEANTV_KEYSTORE_B64` / `CLEANTV_KEYPASS`
 repository secrets. Without them each CI run signs with a throwaway key, and an
 installed home screen can then only be replaced after uninstalling it.
 
+`samsung/` builds `cleantv-samsung.exe`: it installs TizenBrew (which bundles TizenTube)
+on a Samsung TV in developer mode, over sdb (ADB protocol on TCP 26101), as TizenBrew
+Installer does for Tizen 3 to 6. The widget is pinned by hash in `build.sh`. Tizen 7+
+needs a Samsung-account certificate and is refused. Nothing is removed from the TV:
+Tizen gives no shell, so there is no debloat (see `docs/OTHER-TVS.md`).
+
 Windows SmartScreen warns about the unsigned .exe: More info > Run anyway.

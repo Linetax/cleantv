@@ -58,6 +58,9 @@ jobs:
             installer/cleantv-installer.exe
             installer/cleantv-installer-linux
             installer/cleantv-installer-macos
+            installer/cleantv-samsung.exe
+            installer/cleantv-samsung-linux
+            installer/cleantv-samsung-macos
       - name: host-side launcher tests
         run: |
           jar="$ANDROID_HOME/platforms/android-25/android.jar"

@@ -44,7 +44,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          files="installer/cleantv-installer.exe installer/cleantv-installer-linux installer/cleantv-installer-macos launcher/build/dumbtv-home.apk"
+          files="installer/cleantv-installer.exe installer/cleantv-installer-linux installer/cleantv-installer-macos installer/cleantv-samsung.exe launcher/build/dumbtv-home.apk"
           # A release made on the GitHub page already exists: fill it in instead of failing.
           if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
             gh release edit "$GITHUB_REF_NAME" --title "cleantv $GITHUB_REF_NAME" --notes-file installer/RELEASE.md
