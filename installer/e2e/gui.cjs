@@ -78,6 +78,7 @@ async function fireInstall(browser) {
   await page.locator(".zoom").click();
   await click(page, "C'est fait");
   await page.locator("#answer").waitFor();
+  await shot(page, "firetv-adresse");
   await page.fill("#answer", "192.168.1");
   await click(page, "Continuer");
   await visible(page, "pas une adresse IP valide");
@@ -95,6 +96,7 @@ async function fireInstall(browser) {
   await shot(page, "firetv-question-alexa");
   await click(page, "Oui");
   await visible(page, "Installer Cineflux");
+  await shot(page, "firetv-question-cineflux");
   await click(page, "Oui");
   await page.locator("#busyTitle").waitFor({ timeout: 20000 });
   await page.waitForTimeout(600);
@@ -211,10 +213,14 @@ async function samsung(browser) {
   await click(page, "Commencer");
   await visible(page, "Activer le mode développeur");
   await shot(page, "samsung-mode-developpeur");
+  await page.locator(".main").evaluate((m) => m.scrollTo(0, m.scrollHeight)); // step D sits below the fold
+  await shot(page, "samsung-mode-developpeur-suite");
   await click(page, "La TV a redémarré");
   await page.fill("#answer", "127.0.0.1");
   await shot(page, "samsung-adresse");
   await click(page, "Continuer");
+  await page.locator("#busyTitle", { hasText: "Installer TizenBrew" }).waitFor({ timeout: 20000 });
+  await shot(page, "samsung-installation");
   await visible(page, "C'est terminé");
   await shot(page, "samsung-termine");
   check("samsung window: sends TizenBrew to the TV", tv.got.pushed > 0);
