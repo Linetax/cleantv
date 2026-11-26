@@ -563,10 +563,11 @@ function ending(m) {
     body = `<div class="callout bad" style="text-align:left;max-width:640px">${ICONS.warn}<div class="body">${render(m.end.text.split("\n"))}</div></div>
       <p class="hint">Rien n'est cassé : vous pouvez relancer l'installateur quand vous voulez.</p>`;
   } else {
-    // The step the last question was in, and every step since.
     const ev = st.events;
-    // The steps after the last question, else the one it was asked in.
-    let from = ev.findIndex((e, i) => i > m.lastAnswer && e.t === "step");
+    // From the program's recap mark when it set one, else the steps after the last
+    // question, else the one it was asked in.
+    let from = ev.map((e) => e.t).lastIndexOf("recap");
+    if (from < 0) from = ev.findIndex((e, i) => i > m.lastAnswer && e.t === "step");
     if (from < 0) {
       from = m.lastAnswer;
       if (ev[from] && ev[from].kind === "choice") from = ev.length; // "Quitter": nothing to sum up

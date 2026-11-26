@@ -52,11 +52,13 @@ func main() {
 	checkVersion(s)
 	cineflux := yes("Ajouter Cineflux dans TizenBrew ?", true)
 	install(s)
-	if cineflux {
-		addCineflux(s)
-	}
-	afterInstall()
+	added := !cineflux || addCineflux(s)
 	tips()
+	ui.Recap() // the last page shows only what is left to do on the TV
+	afterInstall()
+	if !added {
+		addCinefluxByHand()
+	}
 	finish()
 }
 
@@ -210,15 +212,21 @@ func installResult(out string) (bool, string) {
 }
 
 // addCineflux adds the Cineflux module to TizenBrew's list, keeping the modules already there.
-func addCineflux(s *sdb) {
+func addCineflux(s *sdb) bool {
 	step("Ajouter Cineflux")
 	if err := addModule(s, cinefluxModule); err != nil {
 		ui.Say("Cineflux n'a pas pu être ajouté tout seul (" + err.Error() + ").")
-		ui.Say("À faire sur la TV, une fois TizenBrew ouvert : Gestionnaire de modules >")
-		ui.Say("Ajouter un Module GitHub > tapez " + strings.TrimPrefix(cinefluxModule, "gh/") + ".")
-		return
+		return false
 	}
 	ui.Say("Cineflux est ajouté dans TizenBrew, à côté de TizenTube.")
+	return true
+}
+
+func addCinefluxByHand() {
+	step("Ajouter Cineflux à la main")
+	ui.Say("L'ajout automatique n'a pas marché. Sur la TV, une fois TizenBrew ouvert :")
+	ui.Say("  a. Gestionnaire de modules, puis « Ajouter un Module GitHub ».")
+	ui.Say("  b. Tapez " + strings.TrimPrefix(cinefluxModule, "gh/") + ", puis OK.")
 }
 
 func addModule(s *sdb, module string) error {

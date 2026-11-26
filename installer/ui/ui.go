@@ -66,6 +66,14 @@ func Step(title string) {
 	fmt.Printf("\n--- %s ---\n", title)
 }
 
+// Recap marks where the window's last page starts: only the steps after it are shown
+// there (what is left to do). Everything stays in the details panel. No-op in a console.
+func Recap() {
+	if win != nil {
+		win.emit(event{T: "recap"})
+	}
+}
+
 // Ask reads a line, def when it is empty.
 func Ask(q, def string) string {
 	if win != nil {
