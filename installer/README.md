@@ -27,7 +27,9 @@ installed home screen can then only be replaced after uninstalling it.
 on a Samsung TV in developer mode, over sdb (ADB protocol on TCP 26101), as TizenBrew
 Installer does for Tizen 3 to 6. The widget is pinned by hash in `build.sh`. Tizen 7+
 needs a Samsung-account certificate and is refused. Nothing is removed from the TV:
-Tizen gives no shell, so there is no debloat (see `docs/OTHER-TVS.md`).
+Tizen gives no shell, so there is no debloat (see `docs/OTHER-TVS.md`). On request it adds
+the Cineflux module (`../tizenbrew-cineflux`) to TizenBrew's settings file, keeping the
+modules already listed.
 
 Both installers show a window: `ui/` serves a small page on 127.0.0.1 (random port,
 random token) and opens it in an Edge app window (Chrome, then the default browser, as

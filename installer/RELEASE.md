@@ -49,9 +49,9 @@ passages sponsorisés). Pour les Samsung de 2017 à 2022 (Tizen 3 à 6). Les mod
 1. Téléchargez **cleantv-samsung.exe** ci-dessous et lancez-le (même avertissement
    SmartScreen que plus haut).
 2. Il explique comment activer le mode développeur (Apps, puis 12345) avec l'adresse
-   du PC, se connecte à la TV et installe TizenBrew.
+   du PC, se connecte à la TV et installe TizenBrew, avec Cineflux si vous le voulez.
 3. À la fin, remettez l'adresse du mode développeur sur 127.0.0.1, redémarrez la TV et
-   ouvrez TizenBrew, puis TizenTube.
+   ouvrez TizenBrew, puis TizenTube ou Cineflux.
 
 Samsung ne permet pas d'enlever ses applis ni de changer l'accueil : il n'y a pas
 d'allègement comme sur Fire TV. L'assistant indique deux réglages manuels qui aident

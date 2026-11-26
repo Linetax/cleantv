@@ -3,20 +3,22 @@ package main
 import (
 	"bytes"
 	"encoding/binary"
+	"encoding/json"
 	"net"
 	"strings"
 	"testing"
 	"time"
 )
 
-// fakeTV answers like sdbd on a Tizen TV: sysinfo, sync push and a vd_appinstall shell.
-func fakeTV(t *testing.T, version, shellOut string) (ip string, pushed chan []byte) {
+// fakeTV answers like sdbd on a Tizen TV: sysinfo, sync push and pull, and a vd_appinstall
+// shell. files holds what the TV has; every completed push is also sent on pushed.
+func fakeTV(t *testing.T, version, shellOut string, files map[string][]byte) (ip string, pushed chan []byte) {
 	ln, err := net.Listen("tcp", "127.0.0.1:26101")
 	if err != nil {
 		t.Skip("port 26101 busy: ", err)
 	}
 	t.Cleanup(func() { ln.Close() })
-	pushed = make(chan []byte, 1)
+	pushed = make(chan []byte, 4)
 	go func() {
 		c, err := ln.Accept()
 		if err != nil {
@@ -26,6 +28,12 @@ func fakeTV(t *testing.T, version, shellOut string) (ip string, pushed chan []by
 		services := map[uint32]string{}
 		var sync bytes.Buffer
 		send := func(p packet) { _ = writePacket(c, p) }
+		syncMsg := func(id string, data []byte) []byte {
+			b := make([]byte, 8, 8+len(data))
+			copy(b, id)
+			binary.LittleEndian.PutUint32(b[4:], uint32(len(data)))
+			return append(b, data...)
+		}
 		for {
 			p, err := readPacket(c)
 			if err != nil {
@@ -56,10 +64,24 @@ func fakeTV(t *testing.T, version, shellOut string) (ip string, pushed chan []by
 					continue
 				}
 				sync.Write(p.data)
-				if data, done := parseSync(sync.Bytes()); done {
-					pushed <- data
-					sync.Reset()
-					send(packet{cmdWRTE, p.arg1, p.arg0, []byte("OKAY\x00\x00\x00\x00")})
+				for {
+					kind, path, data, n := parseSync(sync.Bytes())
+					if n == 0 {
+						break
+					}
+					sync.Next(n)
+					switch kind {
+					case "SEND":
+						files[path] = data
+						pushed <- data
+						send(packet{cmdWRTE, p.arg1, p.arg0, []byte("OKAY\x00\x00\x00\x00")})
+					case "RECV":
+						if f, ok := files[path]; ok {
+							send(packet{cmdWRTE, p.arg1, p.arg0, append(syncMsg("DATA", f), syncMsg("DONE", nil)...)})
+						} else {
+							send(packet{cmdWRTE, p.arg1, p.arg0, syncMsg("FAIL", []byte("No such file or directory"))})
+						}
+					}
 				}
 			}
 		}
@@ -67,27 +89,40 @@ func fakeTV(t *testing.T, version, shellOut string) (ip string, pushed chan []by
 	return "127.0.0.1", pushed
 }
 
-// parseSync returns the file once SEND, DATA... and DONE have all arrived.
-func parseSync(b []byte) ([]byte, bool) {
-	var file []byte
-	for len(b) >= 8 {
-		id, n := string(b[:4]), int(binary.LittleEndian.Uint32(b[4:8]))
-		if id == "DONE" {
-			return file, true
-		}
-		if len(b) < 8+n {
-			return nil, false
-		}
-		if id == "DATA" {
-			file = append(file, b[8:8+n]...)
-		}
-		b = b[8+n:]
+// parseSync reads one complete sync request: SEND (path, DATA..., DONE), RECV or QUIT. It
+// returns how many bytes it used, 0 while the request is incomplete.
+func parseSync(b []byte) (kind, path string, file []byte, used int) {
+	if len(b) < 8 {
+		return "", "", nil, 0
 	}
-	return nil, false
+	kind, n := string(b[:4]), int(binary.LittleEndian.Uint32(b[4:8]))
+	if kind == "QUIT" {
+		return kind, "", nil, 8
+	}
+	if len(b) < 8+n {
+		return "", "", nil, 0
+	}
+	path, used = string(b[8:8+n]), 8+n
+	if kind == "RECV" {
+		return kind, path, nil, used
+	}
+	path, _, _ = strings.Cut(path, ",") // SEND "path,mode"
+	for len(b) >= used+8 {
+		id, n := string(b[used:used+4]), int(binary.LittleEndian.Uint32(b[used+4:used+8]))
+		if id == "DONE" {
+			return kind, path, file, used + 8
+		}
+		if len(b) < used+8+n {
+			break
+		}
+		file = append(file, b[used+8:used+8+n]...)
+		used += 8 + n
+	}
+	return "", "", nil, 0
 }
 
 func TestInstallOnFakeTV(t *testing.T) {
-	ip, pushed := fakeTV(t, "6.0", "app_id[xvvl3S1bvH.TizenBrewStandalone] install completed\nspend time for wascmd is [900]ms\n")
+	ip, pushed := fakeTV(t, "6.0", "app_id[xvvl3S1bvH.TizenBrewStandalone] install completed\nspend time for wascmd is [900]ms\n", map[string][]byte{})
 	s, err := dialSDB(ip)
 	if err != nil {
 		t.Fatal(err)
@@ -98,7 +133,7 @@ func TestInstallOnFakeTV(t *testing.T) {
 		t.Fatalf("version %q %v", v, err)
 	}
 	wgt := bytes.Repeat([]byte("tizenbrew"), 5000) // several sync chunks and packets
-	if err := s.push(remoteWgt, wgt); err != nil {
+	if err := s.push(remoteWgt, wgt, 0o755); err != nil {
 		t.Fatal(err)
 	}
 	if got := <-pushed; !bytes.Equal(got, wgt) {
@@ -107,6 +142,49 @@ func TestInstallOnFakeTV(t *testing.T) {
 	out, err := s.shell("0 vd_appinstall "+tizenbrewPkg+" "+remoteWgt, nil)
 	if ok, _ := installResult(out); err != nil || !ok {
 		t.Fatalf("install: %q %v", out, err)
+	}
+}
+
+func TestAddModule(t *testing.T) {
+	for name, tc := range map[string]struct {
+		before string // "" = no settings file yet
+		want   []string
+	}{
+		"fresh TizenBrew": {"", []string{"npm/@foxreis/tizentube", cinefluxModule}},
+		"keeps other modules": {`{"modules":["npm/@foxreis/tizentube","npm/other"],"autoLaunchModule":"npm/other"}`,
+			[]string{"npm/@foxreis/tizentube", "npm/other", cinefluxModule}},
+		"already there": {`{"modules":["` + cinefluxModule + `"]}`, []string{cinefluxModule}},
+	} {
+		t.Run(name, func(t *testing.T) {
+			files := map[string][]byte{}
+			if tc.before != "" {
+				files[tizenbrewConfig] = []byte(tc.before)
+			}
+			ip, _ := fakeTV(t, "6.0", "", files)
+			s, err := dialSDB(ip)
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer s.Close()
+			s.deadline(10 * time.Second)
+			if err := addModule(s, cinefluxModule); err != nil {
+				t.Fatal(err)
+			}
+			got, err := s.pull(tizenbrewConfig)
+			if err != nil {
+				t.Fatal(err)
+			}
+			var cfg struct {
+				Modules          []string
+				AutoLaunchModule string
+			}
+			if err := json.Unmarshal(got, &cfg); err != nil || strings.Join(cfg.Modules, " ") != strings.Join(tc.want, " ") {
+				t.Fatalf("settings = %s (%v)", got, err)
+			}
+			if name == "keeps other modules" && cfg.AutoLaunchModule != "npm/other" {
+				t.Errorf("lost autoLaunchModule: %s", got)
+			}
+		})
 	}
 }
 

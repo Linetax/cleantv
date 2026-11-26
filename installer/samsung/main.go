@@ -6,7 +6,10 @@
 package main
 
 import (
+	"bytes"
 	_ "embed"
+	"encoding/json"
+	"errors"
 	"net"
 	"os"
 	"path/filepath"
@@ -21,6 +24,10 @@ import (
 var tizenbrew []byte
 
 const (
+	// TizenBrew's settings on the TV, and the Cineflux module it loads through jsDelivr
+	// (see ../../tizenbrew-cineflux). Read by TizenBrew's service every time it lists modules.
+	tizenbrewConfig = "/home/owner/share/tizenbrewConfig.json"
+	cinefluxModule  = "gh/Linetax/cineflux-tizenbrew"
 	// From the widget's config.xml (<tizen:application package=...>).
 	tizenbrewPkg = "xvvl3S1bvH"
 	remoteWgt    = "/home/owner/share/tmp/sdk_tools/package.wgt"
@@ -43,7 +50,11 @@ func main() {
 	s := connect()
 	defer s.Close()
 	checkVersion(s)
+	cineflux := yes("Ajouter Cineflux dans TizenBrew ?", true)
 	install(s)
+	if cineflux {
+		addCineflux(s)
+	}
 	afterInstall()
 	tips()
 	finish()
@@ -53,6 +64,7 @@ func main() {
 
 var (
 	ask    = ui.Ask
+	yes    = ui.Yes
 	step   = ui.Step
 	finish = ui.Finish
 	die    = ui.Die
@@ -161,7 +173,7 @@ func install(s *sdb) {
 	step("3. Installer TizenBrew")
 	ui.Sayf("Envoi de TizenBrew à la TV (%d Ko)...", len(tizenbrew)/1024)
 	s.deadline(5 * time.Minute)
-	if err := s.push(remoteWgt, tizenbrew); err != nil {
+	if err := s.push(remoteWgt, tizenbrew, 0o755); err != nil {
 		die("Envoi impossible : " + err.Error())
 	}
 	ui.Say("Installation sur la TV (jusqu'à une minute)...")
@@ -197,13 +209,58 @@ func installResult(out string) (bool, string) {
 	}
 }
 
+// addCineflux adds the Cineflux module to TizenBrew's list, keeping the modules already there.
+func addCineflux(s *sdb) {
+	step("Ajouter Cineflux")
+	if err := addModule(s, cinefluxModule); err != nil {
+		ui.Say("Cineflux n'a pas pu être ajouté tout seul (" + err.Error() + ").")
+		ui.Say("À faire sur la TV, une fois TizenBrew ouvert : Gestionnaire de modules >")
+		ui.Say("Ajouter un Module GitHub > tapez " + strings.TrimPrefix(cinefluxModule, "gh/") + ".")
+		return
+	}
+	ui.Say("Cineflux est ajouté dans TizenBrew, à côté de TizenTube.")
+}
+
+func addModule(s *sdb, module string) error {
+	// TizenBrew's own defaults when it has no settings file yet.
+	cfg := map[string]any{"modules": []any{"npm/@foxreis/tizentube"}, "autoLaunchServiceList": []any{}, "autoLaunchModule": ""}
+	old, err := s.pull(tizenbrewConfig)
+	switch {
+	case err == nil:
+		if json.Unmarshal(old, &cfg) != nil {
+			return errors.New("réglages de TizenBrew illisibles, laissés tels quels")
+		}
+	case !errors.Is(err, errNoFile):
+		return err
+	}
+	mods, ok := cfg["modules"].([]any)
+	if !ok {
+		return errors.New("réglages de TizenBrew inattendus, laissés tels quels")
+	}
+	for _, m := range mods {
+		if m == module {
+			return nil
+		}
+	}
+	cfg["modules"] = append(mods, module)
+	b, _ := json.MarshalIndent(cfg, "", "    ")
+	// 0666: TizenBrew must still be able to rewrite it when modules are added on the TV.
+	if err := s.push(tizenbrewConfig, b, 0o666); err != nil {
+		return err
+	}
+	if back, err := s.pull(tizenbrewConfig); err != nil || !bytes.Equal(back, b) {
+		return errors.New("la TV n'a pas gardé les réglages")
+	}
+	return nil
+}
+
 func afterInstall() {
 	step("4. Dernier réglage sur la TV")
 	ui.Say("TizenBrew a besoin du mode développeur, mais plus de ce PC :")
 	ui.Say("  a. Apps, puis 1 2 3 4 5 comme tout à l'heure.")
 	ui.Say("  b. Laissez Developer mode sur On, remplacez Host PC IP par 127.0.0.1, OK.")
 	ui.Say("  c. Redémarrez la TV (bouton marche maintenu jusqu'au logo).")
-	ui.Say("  d. Ouvrez TizenBrew dans Apps, puis choisissez TizenTube.")
+	ui.Say("  d. Ouvrez TizenBrew dans Apps, puis choisissez TizenTube ou Cineflux.")
 	ui.Say("Astuce : dans Apps, sur TizenBrew, maintenez OK > « Ajouter à l'accueil »")
 	ui.Say("et placez-le en premier.")
 }

@@ -7,6 +7,7 @@ package main
 import (
 	"bytes"
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -202,8 +203,8 @@ func (s *sdb) platformVersion() (string, error) {
 	return strings.TrimSpace(string(bytes.TrimRight(buf[192:256], "\x00"))), nil
 }
 
-// push copies data to path on the TV (sync service: SEND, DATA..., DONE).
-func (s *sdb) push(path string, data []byte) error {
+// push copies data to path on the TV with the given permissions (sync service: SEND, DATA..., DONE).
+func (s *sdb) push(path string, data []byte, perm uint32) error {
 	st, err := s.open("sync:")
 	if err != nil {
 		return err
@@ -215,7 +216,7 @@ func (s *sdb) push(path string, data []byte) error {
 		binary.LittleEndian.PutUint32(b[4:], uint32(n))
 		return b
 	}
-	spec := path + ",33261" // 0755, as TizenBrew Installer sends it
+	spec := fmt.Sprintf("%s,%d", path, 0o100000|perm) // regular file + permissions, as TizenBrew Installer sends it
 	var req bytes.Buffer
 	req.Write(msg("SEND", len(spec)))
 	req.WriteString(spec)
@@ -259,5 +260,55 @@ func (s *sdb) shell(cmd string, stop func(string) bool) (string, error) {
 		if stop != nil && stop(out.String()) {
 			return out.String(), nil
 		}
+	}
+}
+
+// errNoFile is what pull returns when the TV has no such file.
+var errNoFile = errors.New("fichier absent")
+
+// pull reads a file from the TV (sync service: RECV, then DATA... and DONE, or FAIL).
+func (s *sdb) pull(path string) ([]byte, error) {
+	st, err := s.open("sync:")
+	if err != nil {
+		return nil, err
+	}
+	defer st.close()
+	req := make([]byte, 8, 8+len(path))
+	copy(req, "RECV")
+	binary.LittleEndian.PutUint32(req[4:], uint32(len(path)))
+	if err := st.write(append(req, path...)); err != nil {
+		return nil, err
+	}
+	var buf, file []byte
+	for {
+		for len(buf) >= 8 {
+			id, n := string(buf[:4]), int(binary.LittleEndian.Uint32(buf[4:8]))
+			switch id {
+			case "DONE":
+				_ = st.write([]byte("QUIT\x00\x00\x00\x00"))
+				return file, nil
+			case "DATA", "FAIL":
+				if n > 1<<20 {
+					return nil, fmt.Errorf("réponse sdb invalide")
+				}
+				if len(buf) < 8+n {
+					break
+				}
+				if id == "FAIL" {
+					return nil, fmt.Errorf("%w (%s)", errNoFile, strings.TrimSpace(string(buf[8:8+n])))
+				}
+				file = append(file, buf[8:8+n]...)
+				buf = buf[8+n:]
+				continue
+			default:
+				return nil, fmt.Errorf("réponse sdb inattendue %q", id)
+			}
+			break
+		}
+		d, err := st.read()
+		if err != nil {
+			return nil, fmt.Errorf("lecture interrompue : %v", err)
+		}
+		buf = append(buf, d...)
 	}
 }

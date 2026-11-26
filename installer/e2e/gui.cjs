@@ -149,10 +149,34 @@ async function fireError(browser) {
   await closeWindow(page, run, "error");
 }
 
-// fakeSamsung answers like sdbd on a Tizen 6 TV: sysinfo, sync push and vd_appinstall.
+// fakeSamsung answers like sdbd on a Tizen 6 TV: sysinfo, sync push and pull, vd_appinstall.
 function fakeSamsung() {
   const C = { CNXN: 0x4e584e43, OPEN: 0x4e45504f, OKAY: 0x59414b4f, CLSE: 0x45534c43, WRTE: 0x45545257 };
-  const got = { pushed: 0, installed: false };
+  const got = { pushed: 0, installed: false, files: {} };
+  const msg = (id, data = Buffer.alloc(0)) => {
+    const h = Buffer.alloc(8);
+    h.write(id); h.writeUInt32LE(data.length, 4);
+    return Buffer.concat([h, data]);
+  };
+  // syncRequest reads one complete request (SEND path,mode DATA... DONE | RECV path | QUIT): [used, kind, path, data], used 0 if incomplete.
+  const syncRequest = (b) => {
+    if (b.length < 8) return [0];
+    const kind = b.toString("latin1", 0, 4), n = b.readUInt32LE(4);
+    if (kind === "QUIT") return [8, kind];
+    if (b.length < 8 + n) return [0];
+    let path = b.toString("utf8", 8, 8 + n), used = 8 + n;
+    if (kind === "RECV") return [used, kind, path];
+    path = path.split(",")[0];
+    const parts = [];
+    while (b.length >= used + 8) {
+      const id = b.toString("latin1", used, used + 4), len = b.readUInt32LE(used + 4);
+      if (id === "DONE") return [used + 8, kind, path, Buffer.concat(parts)];
+      if (b.length < used + 8 + len) break;
+      parts.push(b.subarray(used + 8, used + 8 + len));
+      used += 8 + len;
+    }
+    return [0];
+  };
   const server = net.createServer((sock) => {
     let buf = Buffer.alloc(0);
     const svc = {};
@@ -189,10 +213,17 @@ function fakeSamsung() {
           send(C.OKAY, a1, a0);
           if (svc[a1] === "sync:") {
             sync = Buffer.concat([sync, data]);
-            if (sync.includes(Buffer.from("DONE"))) {
-              got.pushed = sync.length;
-              sync = Buffer.alloc(0);
-              send(C.WRTE, a1, a0, Buffer.from("OKAY\0\0\0\0"));
+            for (let r = syncRequest(sync); r[0]; r = syncRequest(sync)) {
+              const [used, kind, file, content] = r;
+              sync = sync.subarray(used);
+              if (kind === "SEND") {
+                got.files[file] = content;
+                if (file.endsWith("package.wgt")) got.pushed = content.length;
+                send(C.WRTE, a1, a0, Buffer.from("OKAY\0\0\0\0"));
+              }
+              if (kind === "RECV") {
+                send(C.WRTE, a1, a0, got.files[file] ? Buffer.concat([msg("DATA", got.files[file]), msg("DONE")]) : msg("FAIL", Buffer.from("No such file or directory")));
+              }
             }
           }
         }
@@ -219,12 +250,17 @@ async function samsung(browser) {
   await page.fill("#answer", "127.0.0.1");
   await shot(page, "samsung-adresse");
   await click(page, "Continuer");
+  await visible(page, "Ajouter Cineflux");
+  await shot(page, "samsung-question-cineflux");
+  await click(page, "Oui");
   await page.locator("#busyTitle", { hasText: "Installer TizenBrew" }).waitFor({ timeout: 20000 });
   await shot(page, "samsung-installation");
   await visible(page, "C'est terminé");
   await shot(page, "samsung-termine");
   check("samsung window: sends TizenBrew to the TV", tv.got.pushed > 0);
   check("samsung window: installs it", tv.got.installed);
+  const cfg = String(tv.got.files["/home/owner/share/tizenbrewConfig.json"] || "");
+  check("samsung window: adds Cineflux next to TizenTube in TizenBrew", cfg.includes("npm/@foxreis/tizentube") && cfg.includes("gh/Linetax/cineflux-tizenbrew"));
   check("samsung window: shows the last settings to make", await page.getByText("127.0.0.1").count() > 0);
   await closeWindow(page, run, "samsung");
   tv.server.close();
