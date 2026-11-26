@@ -23,4 +23,21 @@ The APK is signed with the key in the `CLEANTV_KEYSTORE_B64` / `CLEANTV_KEYPASS`
 repository secrets. Without them each CI run signs with a throwaway key, and an
 installed home screen can then only be replaced after uninstalling it.
 
+`samsung/` builds `cleantv-samsung.exe`: it installs TizenBrew (which bundles TizenTube)
+on a Samsung TV in developer mode, over sdb (ADB protocol on TCP 26101), as TizenBrew
+Installer does for Tizen 3 to 6. The widget is pinned by hash in `build.sh`. Tizen 7+
+needs a Samsung-account certificate and is refused. Nothing is removed from the TV:
+Tizen gives no shell, so there is no debloat (see `docs/OTHER-TVS.md`). On request it adds
+the Cineflux module (`../tizenbrew-cineflux`) to TizenBrew's settings file, keeping the
+modules already listed.
+
+Both installers show a window: `ui/` serves a small page on 127.0.0.1 (random port,
+random token) and opens it in an Edge app window (Chrome, then the default browser, as
+fallbacks); the program ends when the window closes. The page draws every screen from
+what the installer prints and asks, so the logic in `main.go` is the same in both modes.
+`--console` keeps the old terminal mode (Linux/macOS; `e2e/run.sh` uses it). A picture
+named `ui/web/img/<app>-<step>.svg` or `.png` (e.g. `cleantv-preparer-la-tv.svg`) replaces the
+drawing next to that step's instructions. `e2e/gui.cjs` drives both windows in Chrome
+against fake TVs and saves a screenshot of each screen.
+
 Windows SmartScreen warns about the unsigned .exe: More info > Run anyway.

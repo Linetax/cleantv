@@ -1,0 +1,11 @@
+{
+  "name": "cineflux-tizenbrew",
+  "version": "1.0.0",
+  "description": "Cineflux sur TV Samsung, via TizenBrew.",
+  "packageType": "mods",
+  "appName": "Cineflux",
+  "websiteURL": "https://cineflux.linetax.party/",
+  "main": "cineflux.js",
+  "keys": [],
+  "license": "MIT"
+}

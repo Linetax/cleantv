@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Stand-in for adb that plays a Fire TV, for installer/e2e/run.sh. Logs every call to
 # $FAKE_DIR/log. FAKE_MODE picks the device: fireos8 (default), fireos6, notfire, dead,
-# hang, slowauth, oldkey.
+# hang, slowauth, oldkey. FAKE_SLOW=0.2 makes every shell command take that long (window tests).
 d=${FAKE_DIR:?}
 mode=${FAKE_MODE:-fireos8}
 echo "$*" >> "$d/log"
@@ -25,7 +25,7 @@ case $1 in
   uninstall) touch "$d/uninstalled-${2##*.}"; echo Success; exit 0 ;;
   push) cp "$2" "$d/pushed"; exit 0 ;;
   reboot) exit 0 ;;
-  shell) shift ;;
+  shell) shift; sleep "${FAKE_SLOW:-0}" ;;
   *) exit 1 ;;
 esac
 c="$*"

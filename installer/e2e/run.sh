@@ -13,7 +13,7 @@ run() {
   mkdir -p "$dir/bin" "$dir/cache"
   ln -s "$here/fake-adb" "$dir/bin/adb"
   out=$(printf "$input" | FAKE_DIR=$dir FAKE_MODE=$mode XDG_CACHE_HOME=$dir/cache HOME=$dir \
-    PATH="$dir/bin:$PATH" timeout 300 "$bin" 2>&1)
+    PATH="$dir/bin:$PATH" timeout 300 "$bin" --console 2>&1)
   log=$(cat "$dir/log" 2>/dev/null)
   pushed=$(cat "$dir/pushed" 2>/dev/null)
   rm -rf "$dir"
